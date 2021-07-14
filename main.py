@@ -4,11 +4,13 @@ import argparse
 import json
 import os
 from warnings import warn
+import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import BatchSampler, DataLoader
 from dataset import PointCloud
 from model import SIREN, SDFDecoder
+from samplers import SitzmannSampler
 from util import create_output_paths, gradient
 from meshing import create_mesh
 
@@ -66,23 +68,30 @@ def sdf_loss(X, gt):
         grad_constraint.mean() * 5e1
 
 
-def train_model(dataset, model, train_config, silent=False):
+def train_model(dataset, model, device, train_config, silent=False):
     BATCH_SIZE = train_config["batch_size"]
     EPOCHS = train_config["epochs"]
     EPOCHS_TIL_CHECKPOINT = train_config["epochs_to_checkpoint"]
 
     loss_fn = train_config["loss_fn"]
     optim = train_config["optimizer"]
-    train_loader = DataLoader(dataset,
-                              batch_size=BATCH_SIZE)
+    sampler = train_config["sampler"]
+    train_loader = DataLoader(
+        dataset,
+        batch_sampler=BatchSampler(sampler, batch_size=BATCH_SIZE, drop_last=False)
+    )
+    model.to(device)
 
     losses = [0.] * EPOCHS
     for epoch in range(EPOCHS):
         running_loss = 0.0
         for i, data in enumerate(train_loader, start=0):
             # get the inputs; data is a list of [inputs, labels]
-            inputs = data["coords"]
-            gt = {"sdf": data["sdf"], "normals": data["normals"]}
+            inputs = data["coords"].to(device)
+            gt = {
+                "sdf": data["sdf"].to(device),
+                "normals": data["normals"].to(device)
+            }
 
             # zero the parameter gradients
             optim.zero_grad()
@@ -113,6 +122,8 @@ def train_model(dataset, model, train_config, silent=False):
         os.path.join(full_path, "model_final.pth")
     )
 
+    return losses
+
 
 def load_experiment_parameters(parameters_path):
     try:
@@ -135,8 +146,9 @@ if __name__ == "__main__":
         help="Suppresses informational output messages"
     )
     args = p.parse_args()
-
     parameter_dict = load_experiment_parameters(args.experiment_path)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     EPOCHS = parameter_dict["num_epochs"]
     SAMPLES_ON_SURFACE = parameter_dict["sampling_opts"]["samples_on_surface"]
@@ -153,9 +165,10 @@ if __name__ == "__main__":
     dataset = PointCloud(
         os.path.join("data", parameter_dict["dataset"]),
         SAMPLES_ON_SURFACE,
-        SAMPLES_OFF_SURFACE,
-        -1
+        scaling="sphere",
+        off_surface_sdf=-1
     )
+    sampler = SitzmannSampler(dataset, SAMPLES_OFF_SURFACE)
     model = SIREN(
         n_in_features=3,
         n_out_features=1,
@@ -174,12 +187,16 @@ if __name__ == "__main__":
         "epochs": EPOCHS,
         "batch_size": BATCH_SIZE,
         "epochs_to_checkpoint": EPOCHS_TIL_CHECKPOINT,
+        "sampler": sampler,
         "log_path": full_path,
         "optimizer": optimizer,
         "loss_fn": sdf_loss
     }
 
-    train_model(dataset, model, config_dict, silent=args.silent)
+    losses = train_model(dataset, model, device, config_dict, silent=args.silent)
+    np.savetxt(os.path.join(full_path, "losses.txt"), np.array(losses))
 
+    mesh_file = parameter_dict["reconstruction"]["output_file"]
+    mesh_resolution = parameter_dict["reconstruction"]["resolution"]
     decoder = SDFDecoder(os.path.join(full_path, "model_final.pth"))
-    create_mesh(decoder, os.path.join(full_path, "test_mesh"))
+    create_mesh(decoder, os.path.join(full_path, mesh_file), N=mesh_resolution)
