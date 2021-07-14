@@ -66,7 +66,7 @@ def sdf_loss(X, gt):
         grad_constraint.mean() * 5e1
 
 
-def train_model(dataset, model, train_config):
+def train_model(dataset, model, train_config, silent=False):
     BATCH_SIZE = train_config["batch_size"]
     EPOCHS = train_config["epochs"]
     EPOCHS_TIL_CHECKPOINT = train_config["epochs_to_checkpoint"]
@@ -104,7 +104,8 @@ def train_model(dataset, model, train_config):
             )
 
         losses[epoch] = running_loss
-        print(f"Epoch: {epoch} - Loss: {running_loss}")
+        if not silent:
+            print(f"Epoch: {epoch} - Loss: {running_loss}")
 
     # saving the final model
     torch.save(
@@ -128,6 +129,10 @@ if __name__ == "__main__":
     p.add_argument(
         "experiment_path",
         help="Path to the JSON experiment description file"
+    )
+    p.add_argument(
+        "-s", "--silent", action="store_true",
+        help="Suppresses informational output messages"
     )
     args = p.parse_args()
 
@@ -174,7 +179,7 @@ if __name__ == "__main__":
         "loss_fn": sdf_loss
     }
 
-    train_model(dataset, model, config_dict)
+    train_model(dataset, model, config_dict, silent=args.silent)
 
     decoder = SDFDecoder(os.path.join(full_path, "model_final.pth"))
     create_mesh(decoder, os.path.join(full_path, "test_mesh"))

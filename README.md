@@ -28,6 +28,8 @@ python main.py experiments/test_experiment.json
 ```
 6. Run MeshLab and open the resulting mesh file `logs/pipeline_test/test_mesh.ply`
 
+Alternatively, on Linux and macOS systems, steps 3-5 are implemented on the `Makefile` at the root of the project.
+
 ## Citation
 If you find our work useful in your research, please cite:
 ```
