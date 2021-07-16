@@ -196,7 +196,14 @@ if __name__ == "__main__":
     losses = train_model(dataset, model, device, config_dict, silent=args.silent)
     np.savetxt(os.path.join(full_path, "losses.txt"), np.array(losses))
 
+    # full_path = "logs/double_torus"
     mesh_file = parameter_dict["reconstruction"]["output_file"]
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
-    decoder = SDFDecoder(os.path.join(full_path, "model_final.pth"))
+    decoder = SDFDecoder(
+        os.path.join(full_path, "model_final.pth"),
+        n_in_features=3,
+        n_out_features=1,
+        hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
+        w0=parameter_dict["network"]["w0"]
+    )
     create_mesh(decoder, os.path.join(full_path, mesh_file), N=mesh_resolution)

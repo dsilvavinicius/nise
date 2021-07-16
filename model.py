@@ -97,17 +97,17 @@ class SIREN(nn.Module):
 
 
 class SDFDecoder(torch.nn.Module):
-    def __init__(self, state_dict_path, cuda=False):
+    def __init__(self, state_dict_path, n_in_features, n_out_features,
+                 hidden_layer_config, w0, device="cpu"):
         super().__init__()
         self.model = SIREN(
-            n_in_features=3,
-            n_out_features=1,
-            hidden_layer_config=[8, 8, 8],
-            w0=5
+            n_in_features=n_in_features,
+            n_out_features=n_out_features,
+            hidden_layer_config=hidden_layer_config,
+            w0=w0
         )
         self.model.load_state_dict(torch.load(state_dict_path))
-        if cuda:
-            self.model.cuda()
+        self.model.to(device)
 
     def forward(self, x):
         """Forward pass of the model.
