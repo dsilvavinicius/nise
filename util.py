@@ -1,11 +1,10 @@
 # coding: utf-8
 
+import json
 import os
 import shutil
 from warnings import warn
-import numpy as np
 import torch
-from mesh_to_sdf import get_surface_point_cloud
 
 
 def create_output_paths(checkpoint_path, experiment_name, overwrite=True):

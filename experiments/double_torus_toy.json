@@ -1,0 +1,27 @@
+{
+    "description": "Simple experiment to test the learning pipeline.",
+    "num_epochs": 1000,
+    "sampling_opts": {
+        "samples_on_surface": 50000,
+        "samples_off_surface": 50000,
+        "random_surf_samples": true
+    },
+    "dataset": "double_torus.ply",
+    "batch_size": 10000,
+    "checkpoint_path": "logs",
+    "experiment_name": "double_torus_toy_b1e4_256-256-256_rand_nosampler",
+    "epochs_to_checkpoint": 10,
+    "epochs_to_reconstruction": 10,
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 128,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [256, 256, 256],
+        "w0": 5
+    }
+}

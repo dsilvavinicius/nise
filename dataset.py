@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 
 def _sample_on_surface(mesh: trimesh.Trimesh,
                        n_points: int,
-                       sample_vertices=True):
+                       sample_vertices=True) -> torch.Tensor:
     if sample_vertices:
         idx = np.random.choice(
             np.arange(start=0, stop=len(mesh.vertices)),
@@ -37,7 +37,7 @@ def _sample_on_surface(mesh: trimesh.Trimesh,
 
 def _sample_domain(point_cloud: SurfacePointCloud,
                    n_points: int,
-                   balance_in_out_points=False):
+                   balance_in_out_points=False) -> torch.Tensor:
     domain_points = np.random.uniform(-1, 1, size=(n_points, 3))
     domain_sdf, domain_normals = point_cloud.get_sdf(
         domain_points,
@@ -83,17 +83,43 @@ class PointCloud(Dataset):
         an unit sphere). Default is None.
 
     off_surface_sdf: number, optional
-        Value to replace the SDF calculated by `sample_mesh` for points with
-        SDF != 0. May be used to replicate the behavior of Sitzmann et al. If
-        set to `None` uses the SDF estimated by `sample_mesh`.
+        Value to replace the SDF calculated by the sampling function for points
+        with SDF != 0. May be used to replicate the behavior of Sitzmann et al.
+        If set to `None` (default) uses the SDF estimated by the sampling
+        function.
+
+    off_surface_normals: np.array(size=(1, 3)), optional
+        Value to replace the normals calculated by the sampling algorithm for
+        points with SDF != 0. May be used to replicate the behavior of Sitzmann
+        et al. If set to `None` (default) uses the SDF estimated by the
+        sampling function.
 
     random_surf_samples: boolean, optional
+        Wheter to randomly return points on surface (SDF=0) on `__getitem__`.
+        If set to False (default), will return the specified point. Otherwise,
+        `__getitem__` will return a randomly selected point, even if the same
+        `idx` is provided.
 
-    verbosity:
+    no_sampler: boolean, optional
+        When this option is True, we assume that no sampler will be provided to
+        the DataLoader, meaning that our `__getitem__` will return a batch of
+        points instead of a single point, mimicking the behavior of Sitzmann
+        et al. [1]. Default is False, meaning that an external sampler will be
+        used.
+
+    batch_size: integer, optional
+        Only used when `no_sampler` is `True`. Used for fetching `batch_size`
+        at every call of `__getitem__`. If set to 0 (default), fetches all
+        on-surface points at every call.
+
+    silent: boolean, optional
+        Whether to report the progress of loading and processing the mesh (if
+        set to False, default behavior), or not (if True).
 
     See Also
     --------
-    sample_mesh
+    trimesh.load, mesh_to_sdf.get_surface_point_cloud, _sample_domain,
+    _sample_on_surface
 
     References
     ----------
@@ -102,11 +128,16 @@ class PointCloud(Dataset):
     Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
     """
     def __init__(self, mesh_path, samples_on_surface, scaling=None,
-                 off_surface_sdf=None, random_surf_samples=False, silent=False):
+                 off_surface_sdf=None, off_surface_normals=None,
+                 random_surf_samples=False, no_sampler=False, batch_size=0,
+                 silent=False):
         super().__init__()
 
         self.samples_on_surface = samples_on_surface
         self.off_surface_sdf = off_surface_sdf
+        self.off_surface_normals = torch.from_numpy(off_surface_normals.astype(np.float32))
+        self.no_sampler = no_sampler
+        self.batch_size = batch_size
 
         if not silent:
             print(f"Loading mesh \"{mesh_path}\".")
@@ -133,7 +164,6 @@ class PointCloud(Dataset):
 
         # We will fetch random samples at every access.
         self.random_surf_samples = random_surf_samples
-        # if not random_surf_samples:
         if not silent:
             print("Sampling surface.")
 
@@ -143,13 +173,27 @@ class PointCloud(Dataset):
             sample_vertices=True
         )
 
+        if not silent:
+            print("Done preparing the dataset.")
+
     def __len__(self):
+        if self.no_sampler:
+            return self.samples_on_surface // self.batch_size
         return self.samples_on_surface
 
     def __getitem__(self, idx):
+        if self.no_sampler:
+            return self._random_sampling(self.batch_size)
+
+        # For indices of points-on-surface, we select and return a point with
+        # sdf=0.
         if idx in range(self.samples_on_surface):
             if self.random_surf_samples:
-                i = np.random.choice(range(self.samples_on_surface), 1, False)
+                i = np.random.choice(
+                    range(self.samples_on_surface),
+                    size=1,
+                    replace=False
+                )
                 sample = self.surface_samples[i, :]
             else:
                 sample = self.surface_samples[idx, :]
@@ -159,11 +203,63 @@ class PointCloud(Dataset):
                 "sdf": sample[0, -1].float(),
             }
 
+        # If the provided idx is out-of-range, we simply sample from the
+        # domain.
         sample = _sample_domain(self.point_cloud, 1)
         if self.off_surface_sdf is not None:
             sample[0, -1] = self.off_surface_sdf
+        if self.off_surface_normals is not None:
+            sample[0, 3:6] = torch.from_numpy(self.off_surface_normals)
         return {
             "coords": sample[0, :3].float(),
             "normals": sample[0, 3:6].float(),
             "sdf": sample[0, -1].float(),
+        }
+
+    def _random_sampling(self, n_points):
+        """Randomly samples points on the surface and function domain."""
+        if n_points <= 0:
+            n_points = self.samples_on_surface
+
+        on_surface_count = n_points // 2
+        off_surface_count = n_points - on_surface_count
+
+        on_surface_idx = np.random.choice(
+            range(self.samples_on_surface),
+            size=on_surface_count,
+            replace=False
+        )
+        on_surface_samples = self.surface_samples[on_surface_idx, :]
+
+        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 3))
+        if self.off_surface_sdf is not None or self.off_surface_normals is not None:
+            off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
+                off_surface_points,
+                use_depth_buffer=False,
+                return_gradients=True
+            )
+            off_surface_samples = torch.from_numpy(np.hstack((
+                off_surface_points,
+                off_surface_normals,
+                off_surface_sdf[:, np.newaxis]
+            )).astype(np.float32))
+            if self.off_surface_sdf is not None:
+                off_surface_samples[:, -1] = self.off_surface_sdf
+            if self.off_surface_normals is not None:
+                off_surface_samples[:, 3:6] = self.off_surface_normals
+        else:
+            off_surface_sdf = np.full((off_surface_count, 1), self.off_surface_sdf, dtype=np.float32)
+            off_surface_normals = np.zeros((off_surface_count, 3), dtype=np.float32)
+            off_surface_samples = torch.from_numpy(np.hstack((
+                off_surface_points,
+                off_surface_normals,
+                off_surface_sdf
+            )))
+
+        samples = torch.cat((on_surface_samples, off_surface_samples), dim=0)
+
+        return {
+            "coords": samples[:, :3].float(),
+            "normals": samples[:, 3:6].float(),
+            "sdf": samples[:, -1].float()
         }

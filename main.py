@@ -3,7 +3,7 @@
 import argparse
 import json
 import os
-from warnings import warn
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -11,7 +11,7 @@ from torch.utils.data import BatchSampler, DataLoader
 from dataset import PointCloud
 from model import SIREN, SDFDecoder
 from samplers import SitzmannSampler
-from util import create_output_paths, gradient
+from util import create_output_paths, gradient, load_experiment_parameters
 from meshing import create_mesh
 
 
@@ -116,6 +116,7 @@ def train_model(dataset, model, device, train_config, silent=False):
             # forward + backward + optimize
             outputs = model(inputs)
             loss = loss_fn(outputs, gt)
+
             train_loss = torch.zeros((1, 1), device=device)
             for it, l in loss.items():
                 train_loss += l
@@ -124,12 +125,11 @@ def train_model(dataset, model, device, train_config, silent=False):
                     running_loss[it] = l.item()
                 else:
                     running_loss[it] += l.item()
+
             train_loss.backward()
             optim.step()
 
-            # accumulate statistics
-            # running_loss += train_loss.item()
-
+        # accumulate statistics
         for it, l in running_loss.items():
             if it in losses:
                 losses[it][epoch] = l
@@ -213,10 +213,14 @@ if __name__ == "__main__":
         sampling_config["samples_on_surface"],
         scaling="bbox",
         off_surface_sdf=-1,
+        off_surface_normals=np.array([-1, -1, -1]),
         random_surf_samples=sampling_config["random_surf_samples"],
+        no_sampler=True,
+        batch_size=parameter_dict["batch_size"],
         silent=False
     )
-    sampler = SitzmannSampler(dataset, sampling_config["samples_off_surface"])
+    sampler = None
+    # sampler = SitzmannSampler(dataset, sampling_config["samples_off_surface"])
     model = SIREN(
         n_in_features=3,
         n_out_features=1,
@@ -237,11 +241,11 @@ if __name__ == "__main__":
         "epochs": parameter_dict["num_epochs"],
         "batch_size": parameter_dict["batch_size"],
         "epochs_to_checkpoint": parameter_dict["epochs_to_checkpoint"],
+        "epochs_to_reconstruct": parameter_dict["epochs_to_reconstruction"],
         "sampler": sampler,
         "log_path": full_path,
         "optimizer": optimizer,
         "loss_fn": sdf_loss,
-        "epochs_to_reconstruct": 10,
         "mc_resolution": parameter_dict["reconstruction"]["resolution"]
     }
 
@@ -255,7 +259,7 @@ if __name__ == "__main__":
     loss_df = pd.DataFrame.from_dict(losses)
     loss_df.to_csv(os.path.join(full_path, "losses.csv"), sep=";", index=None)
 
-    # full_path = "logs/double_torus"
+    # reconstructing the final mesh
     mesh_file = parameter_dict["reconstruction"]["output_file"]
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
     decoder = SDFDecoder(
