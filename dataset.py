@@ -44,7 +44,7 @@ def _sample_domain(point_cloud: SurfacePointCloud,
         use_depth_buffer=False,
         return_gradients=True
     )
-    if balance_in_out_points:
+    if balance_in_out_points and n_points > 1:
         in_surf = domain_sdf < 0
         domain_sdf = np.concatenate((
             domain_sdf[in_surf],
@@ -87,6 +87,10 @@ class PointCloud(Dataset):
         SDF != 0. May be used to replicate the behavior of Sitzmann et al. If
         set to `None` uses the SDF estimated by `sample_mesh`.
 
+    random_surf_samples: boolean, optional
+
+    verbosity:
+
     See Also
     --------
     sample_mesh
@@ -98,11 +102,14 @@ class PointCloud(Dataset):
     Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
     """
     def __init__(self, mesh_path, samples_on_surface, scaling=None,
-                 off_surface_sdf=None):
+                 off_surface_sdf=None, random_surf_samples=False, silent=False):
         super().__init__()
 
         self.samples_on_surface = samples_on_surface
         self.off_surface_sdf = off_surface_sdf
+
+        if not silent:
+            print(f"Loading mesh \"{mesh_path}\".")
 
         mesh = trimesh.load(mesh_path)
         if scaling is not None:
@@ -114,12 +121,22 @@ class PointCloud(Dataset):
                 raise ValueError("Invalid scaling option.")
 
         self.mesh = mesh
+        if not silent:
+            print("Creating point-cloud and acceleration structures.")
+
         self.point_cloud = get_surface_point_cloud(
             mesh,
             surface_point_method="scan",
             bounding_radius=1,
             calculate_normals=True
         )
+
+        # We will fetch random samples at every access.
+        self.random_surf_samples = random_surf_samples
+        # if not random_surf_samples:
+        if not silent:
+            print("Sampling surface.")
+
         self.surface_samples = _sample_on_surface(
             mesh,
             samples_on_surface,
@@ -130,11 +147,16 @@ class PointCloud(Dataset):
         return self.samples_on_surface
 
     def __getitem__(self, idx):
-        if idx in range(self.surface_samples.size(0)):
+        if idx in range(self.samples_on_surface):
+            if self.random_surf_samples:
+                i = np.random.choice(range(self.samples_on_surface), 1, False)
+                sample = self.surface_samples[i, :]
+            else:
+                sample = self.surface_samples[idx, :]
             return {
-                "coords": self.surface_samples[idx, :3].float(),
-                "normals": self.surface_samples[idx, 3:6].float(),
-                "sdf": self.surface_samples[idx, -1].float(),
+                "coords": sample[0, :3].float(),
+                "normals": sample[0, 3:6].float(),
+                "sdf": sample[0, -1].float(),
             }
 
         sample = _sample_domain(self.point_cloud, 1)

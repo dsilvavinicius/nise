@@ -71,6 +71,7 @@ class SIREN(nn.Module):
             SineLayer(w0)
         ))
 
+        self.w0 = w0
         self.net = nn.Sequential(*net)
         self.net[0].apply(first_layer_sine_init)
         self.net[1:].apply(lambda module: sine_init(module, w0))
@@ -97,7 +98,7 @@ class SIREN(nn.Module):
 
 
 class SDFDecoder(torch.nn.Module):
-    def __init__(self, state_dict_path, n_in_features, n_out_features,
+    def __init__(self, state_dict, n_in_features, n_out_features,
                  hidden_layer_config, w0, device="cpu"):
         super().__init__()
         self.model = SIREN(
@@ -106,7 +107,7 @@ class SDFDecoder(torch.nn.Module):
             hidden_layer_config=hidden_layer_config,
             w0=w0
         )
-        self.model.load_state_dict(torch.load(state_dict_path))
+        self.model.load_state_dict(state_dict)
         self.model.to(device)
 
     def forward(self, x):
