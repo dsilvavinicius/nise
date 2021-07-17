@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch.utils.data import BatchSampler, DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud
 from model import SIREN, SDFDecoder
 from samplers import SitzmannSampler
@@ -99,6 +100,12 @@ def train_model(dataset, model, device, train_config, silent=False):
         )
     model.to(device)
 
+    # Creating the summary storage folder
+    summary_path = os.path.join(full_path, 'summaries')
+    if not os.path.exists(summary_path):
+        os.makedirs(summary_path)
+    writer = SummaryWriter(summary_path)
+
     losses = dict()
     for epoch in range(EPOCHS):
         running_loss = dict()
@@ -126,6 +133,7 @@ def train_model(dataset, model, device, train_config, silent=False):
                 else:
                     running_loss[it] += l.item()
 
+            writer.add_scalar("train_loss", train_loss.item(), epoch)
             train_loss.backward()
             optim.step()
 
@@ -136,6 +144,7 @@ def train_model(dataset, model, device, train_config, silent=False):
             else:
                 losses[it] = [0.] * EPOCHS
                 losses[it][epoch] = l
+            writer.add_scalar(it, l, epoch)
 
         if not silent:
             epoch_loss = 0
@@ -172,6 +181,8 @@ def train_model(dataset, model, device, train_config, silent=False):
                 N=mesh_resolution
             )
 
+    writer.flush()
+    writer.close()
     # saving the final model
     torch.save(
         model.state_dict(),
