@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 from warnings import warn
-import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -180,16 +179,6 @@ def train_model(dataset, model, device, train_config, silent=False):
     )
 
     return losses
-
-
-def load_experiment_parameters(parameters_path):
-    try:
-        with open(parameters_path, "r") as fin:
-            parameter_dict = json.load(fin)
-    except FileNotFoundError:
-        warn("File '{parameters_path}' not found.")
-        return {}
-    return parameter_dict
 
 
 if __name__ == "__main__":
