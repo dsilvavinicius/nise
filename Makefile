@@ -2,7 +2,7 @@ all: meshlab
 
 clean:
 	@rm -Rf __pycache__
-	@rm -Rf logs/pipeline_test
+	@rm -Rf logs/double_torus_toy
 
 data/double_torus.ply:
 	@mkdir data
@@ -13,10 +13,10 @@ data/double_torus.ply:
 	@source .venv/bin/activate
 	@pip install -r requirements.txt
 
-logs/pipeline_test/tesh.ply: data/double_torus.ply
-	@python main.py --silent experiments/test_experiment.json
+logs/double_torus_toy/final.ply: data/double_torus.ply
+	@python main.py experiments/double_torus_toy.json
 
-meshlab: logs/pipeline_test/tesh.ply
-	@meshlab logs/pipeline_test/test.ply
+meshlab: logs/double_torus_toy/final.ply
+	@meshlab logs/double_torus_toy/final.ply
 
 .PHONY: all clean meshlab
