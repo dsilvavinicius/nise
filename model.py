@@ -54,6 +54,7 @@ class SIREN(nn.Module):
     def __init__(self, n_in_features, n_out_features, hidden_layer_config=[],
                  w0=30):
         super().__init__()
+        self.w0 = w0
         net = []
         net.append(nn.Sequential(
             nn.Linear(n_in_features, hidden_layer_config[0]),
@@ -68,10 +69,9 @@ class SIREN(nn.Module):
 
         net.append(nn.Sequential(
             nn.Linear(hidden_layer_config[-1], n_out_features),
-            SineLayer(w0)
+            # SineLayer(w0)
         ))
 
-        self.w0 = w0
         self.net = nn.Sequential(*net)
         self.net[0].apply(first_layer_sine_init)
         self.net[1:].apply(lambda module: sine_init(module, w0))
