@@ -27,6 +27,10 @@ pip install -r requirements.txt
 python main.py experiments/double_torus_toy.json
 ```
 6. Run MeshLab and open the resulting mesh file `logs/double_torus_toy/final.ply`
+7. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress.
+```
+tensorboard --logdir logs/double_torus_toy
+```
 
 Alternatively, on Linux and macOS systems, steps 3-6 are implemented on the `Makefile` at the root of the project.
 
