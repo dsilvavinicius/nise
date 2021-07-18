@@ -182,7 +182,7 @@ def train_model(dataset, model, device, train_config, silent=False):
             if not silent:
                 print(f"Reconstructing mesh for epoch {epoch}")
 
-            mesh_file = f"{epoch}"
+            mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
             decoder = SDFDecoder(
                 model.state_dict(),
@@ -193,7 +193,7 @@ def train_model(dataset, model, device, train_config, silent=False):
             )
             verts, _, normals, _ = create_mesh(
                 decoder,
-                filename=os.path.join(full_path, mesh_file + ".ply"),
+                filename=os.path.join(full_path, mesh_file),
                 N=mesh_resolution
             )
             if normals.strides[1] < 0:
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     loss_df.to_csv(os.path.join(full_path, "losses.csv"), sep=";", index=None)
 
     # reconstructing the final mesh
-    mesh_file = parameter_dict["reconstruction"]["output_file"]
+    mesh_file = parameter_dict["reconstruction"]["output_file"] + ".ply"
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
     decoder = SDFDecoder(
         torch.load(os.path.join(full_path, "model_final.pth")),
