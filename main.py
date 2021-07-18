@@ -142,6 +142,13 @@ def train_model(dataset, model, device, train_config, silent=False):
                 else:
                     running_loss[it] += l.item()
 
+            colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
+            colors[data["sdf"] < 0, :] = torch.Tensor([255, 0, 0])
+            colors[data["sdf"] == 0, :] = torch.Tensor([0, 255, 0])
+            colors[data["sdf"] > 0, :] = torch.Tensor([0, 0, 255])
+            writer.add_mesh(
+                "input", inputs, colors=colors, global_step=epoch
+            )
             writer.add_scalar("train_loss", train_loss.item(), epoch)
             train_loss.backward()
             optim.step()
