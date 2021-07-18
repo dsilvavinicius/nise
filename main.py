@@ -106,6 +106,15 @@ def train_model(dataset, model, device, train_config, silent=False):
         os.makedirs(summary_path)
     writer = SummaryWriter(summary_path)
 
+    # Adding the input point cloud to the summary
+    # As it turns out, this increases the summary size to a point that the
+    # browser hangs.
+    # writer.add_mesh(
+    #     tag="input_point_cloud",
+    #     vertices=torch.from_numpy(dataset.point_cloud.points).unsqueeze(0),
+    #     colors=torch.from_numpy(dataset.point_cloud.normals).unsqueeze(0)
+    # )
+
     losses = dict()
     for epoch in range(EPOCHS):
         running_loss = dict()
@@ -175,10 +184,21 @@ def train_model(dataset, model, device, train_config, silent=False):
                 hidden_layer_config=[x[0].out_features for x in model.net[:-1]],
                 w0=model.w0
             )
-            create_mesh(
+            verts, _, normals, _ = create_mesh(
                 decoder,
-                os.path.join(full_path, mesh_file),
+                filename=os.path.join(full_path, mesh_file + ".ply"),
                 N=mesh_resolution
+            )
+            if normals.strides[1] < 0:
+                normals = normals[:, ::-1]
+            verts = torch.from_numpy(verts).unsqueeze(0)
+            normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
+
+            writer.add_mesh(
+                "reconstructed_point_cloud",
+                vertices=verts,
+                colors=normals,
+                global_step=epoch
             )
 
     writer.flush()
@@ -222,7 +242,7 @@ if __name__ == "__main__":
     dataset = PointCloud(
         os.path.join("data", parameter_dict["dataset"]),
         sampling_config["samples_on_surface"],
-        scaling="bbox",
+        scaling=None,
         off_surface_sdf=-1,
         off_surface_normals=np.array([-1, -1, -1]),
         random_surf_samples=sampling_config["random_surf_samples"],
@@ -230,8 +250,11 @@ if __name__ == "__main__":
         batch_size=parameter_dict["batch_size"],
         silent=False
     )
+
     sampler = None
-    # sampler = SitzmannSampler(dataset, sampling_config["samples_off_surface"])
+    if "sampler" in sampling_config and sampling_config["sampler"] == "sitzmann":
+        sampler = SitzmannSampler(dataset, sampling_config["samples_off_surface"])
+
     model = SIREN(
         n_in_features=3,
         n_out_features=1,
