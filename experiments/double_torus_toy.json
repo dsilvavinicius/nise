@@ -10,7 +10,7 @@
     "dataset": "double_torus.ply",
     "batch_size": 10000,
     "checkpoint_path": "logs",
-    "experiment_name": "double_torus_toy_b1e4_256-256-256_rand_nosampler_2",
+    "experiment_name": "double_torus_toy",
     "epochs_to_checkpoint": 10,
     "epochs_to_reconstruction": 10,
     "optimizer": {
