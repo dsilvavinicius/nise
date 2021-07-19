@@ -10,11 +10,10 @@ data/double_torus.ply:
 
 .venv:
 	@python -m venv .venv
-	@source .venv/bin/activate
-	@pip install -r requirements.txt
+	@./.venv/bin/pip install -r requirements.txt
 
-logs/double_torus_toy/reconstructions/final.ply: data/double_torus.ply
-	@python main.py experiments/double_torus_toy.json
+logs/double_torus_toy/reconstructions/final.ply: data/double_torus.ply .venv
+	@./.venv/bin/python3 main.py experiments/double_torus_toy.json
 
 meshlab: logs/double_torus_toy/reconstructions/final.ply
 	@meshlab logs/double_torus_toy/reconstructions/final.ply
