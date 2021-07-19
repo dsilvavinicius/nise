@@ -16,7 +16,7 @@ def create_mesh(
     max_batch=64 ** 3,
     offset=None,
     scale=None,
-    cuda=False,
+    device="cpu",
     silent=False
 ):
     decoder.eval()
@@ -26,7 +26,7 @@ def create_mesh(
     voxel_size = 2.0 / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
-    samples = torch.zeros(N ** 3, 4)
+    samples = torch.zeros(N ** 3, 4, device=device)
 
     # transform first 3 columns
     # to be the x, y, z index
@@ -48,11 +48,9 @@ def create_mesh(
     while head < num_samples:
         print(head)
         sample_subset = samples[head:min(head + max_batch, num_samples), 0:3]
-        if cuda:
-            sample_subset.cuda()
 
         samples[head:min(head + max_batch, num_samples), 3] = (
-            decoder(sample_subset)
+            decoder(sample_subset)["model_out"]
             .squeeze()
             .detach()
             .cpu()

@@ -69,7 +69,6 @@ class SIREN(nn.Module):
 
         net.append(nn.Sequential(
             nn.Linear(hidden_layer_config[-1], n_out_features),
-            # SineLayer(w0)
         ))
 
         self.net = nn.Sequential(*net)
@@ -95,33 +94,3 @@ class SIREN(nn.Module):
         coords = coords_org
         y = self.net(coords)
         return {"model_in": coords_org, "model_out": y}
-
-
-class SDFDecoder(torch.nn.Module):
-    def __init__(self, state_dict, n_in_features, n_out_features,
-                 hidden_layer_config, w0, device="cpu"):
-        super().__init__()
-        self.model = SIREN(
-            n_in_features=n_in_features,
-            n_out_features=n_out_features,
-            hidden_layer_config=hidden_layer_config,
-            w0=w0
-        )
-        self.model.load_state_dict(state_dict)
-        self.model.to(device)
-
-    def forward(self, x):
-        """Forward pass of the model.
-
-        Parameters
-        ----------
-        x: torch.Tensor
-            The model input containing of size Nx3
-
-        Returns
-        -------
-        dict
-            Dictionary of tensors with the input coordinates under 'model_in'
-            and the model output under 'model_out'.
-        """
-        return self.model(x)["model_out"]

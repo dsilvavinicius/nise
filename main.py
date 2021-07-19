@@ -6,69 +6,14 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud
-from model import SIREN, SDFDecoder
+from model import SIREN
 from samplers import SitzmannSampler
-from util import create_output_paths, gradient, load_experiment_parameters
+from loss import sdf_sitzmann
 from meshing import create_mesh
-
-
-def sdf_loss(X, gt):
-    """Loss function employed in Sitzmann et al. for SDF experiments [1].
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-
-    References
-    ----------
-    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
-    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
-    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
-    """
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
-
-    grad = gradient(pred_sdf, coords)
-    sdf_constraint = torch.where(
-        gt_sdf != -1,
-        pred_sdf,
-        torch.zeros_like(pred_sdf)
-    )
-    inter_constraint = torch.where(
-        gt_sdf != -1,
-        torch.zeros_like(pred_sdf),
-        torch.exp(-1e2 * torch.abs(pred_sdf))
-    )
-    normal_constraint = torch.where(
-        gt_sdf != -1,
-        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-        torch.zeros_like(grad[..., :1])
-    )
-    grad_constraint = torch.abs(grad.norm(dim=-1) - 1)
-    return {
-        "sdf_constraint": torch.abs(sdf_constraint).mean() * 3e3,
-        "inter_constraint": inter_constraint.mean() * 1e2,
-        "normal_constraint": normal_constraint.mean() * 1e2,
-        "grad_constraint": grad_constraint.mean() * 5e1,
-    }
+from util import create_output_paths, load_experiment_parameters
 
 
 def train_model(dataset, model, device, train_config, silent=False):
@@ -142,14 +87,16 @@ def train_model(dataset, model, device, train_config, silent=False):
                 else:
                     running_loss[it] += l.item()
 
+            # Adding an iteration of the training data to tensorboard
             colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
-            colors[data["sdf"] < 0, :] = torch.Tensor([255, 0, 0])
-            colors[data["sdf"] == 0, :] = torch.Tensor([0, 255, 0])
-            colors[data["sdf"] > 0, :] = torch.Tensor([0, 0, 255])
+            colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+            colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+            colors[data["sdf"].squeeze(-1) > 0, :] = torch.Tensor([0, 0, 255])
             writer.add_mesh(
                 "input", inputs, colors=colors, global_step=epoch
             )
             writer.add_scalar("train_loss", train_loss.item(), epoch)
+
             train_loss.backward()
             optim.step()
 
@@ -174,7 +121,7 @@ def train_model(dataset, model, device, train_config, silent=False):
                 print(f"Saving model for epoch {epoch}")
             torch.save(
                 model.state_dict(),
-                os.path.join(full_path, f"model_{epoch}.pth")
+                os.path.join(full_path, "models", f"model_{epoch}.pth")
             )
 
         # reconstructing a mesh at checkpoints
@@ -184,17 +131,11 @@ def train_model(dataset, model, device, train_config, silent=False):
 
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
-            decoder = SDFDecoder(
-                model.state_dict(),
-                n_in_features=3,
-                n_out_features=1,
-                hidden_layer_config=[x[0].out_features for x in model.net[:-1]],
-                w0=model.w0
-            )
             verts, _, normals, _ = create_mesh(
-                decoder,
-                filename=os.path.join(full_path, mesh_file),
-                N=mesh_resolution
+                model,
+                filename=os.path.join(full_path, "reconstructions", mesh_file),
+                N=mesh_resolution,
+                device=device
             )
             if normals.strides[1] < 0:
                 normals = normals[:, ::-1]
@@ -208,14 +149,10 @@ def train_model(dataset, model, device, train_config, silent=False):
                 global_step=epoch
             )
 
+            model.train()
+
     writer.flush()
     writer.close()
-    # saving the final model
-    torch.save(
-        model.state_dict(),
-        os.path.join(full_path, "model_final.pth")
-    )
-
     return losses
 
 
@@ -260,8 +197,12 @@ if __name__ == "__main__":
 
     sampler = None
     if "sampler" in sampling_config and sampling_config["sampler"] == "sitzmann":
-        sampler = SitzmannSampler(dataset, sampling_config["samples_off_surface"])
+        sampler = SitzmannSampler(
+            dataset,
+            sampling_config["samples_off_surface"]
+        )
 
+    hidden_layers = parameter_dict["network"]["hidden_layer_nodes"]
     model = SIREN(
         n_in_features=3,
         n_out_features=1,
@@ -269,7 +210,7 @@ if __name__ == "__main__":
         w0=parameter_dict["network"]["w0"]
     )
     if not args.silent:
-        print(model.net)
+        print(model)
 
     opt_params = parameter_dict["optimizer"]
     if opt_params["type"] == "adam":
@@ -286,7 +227,7 @@ if __name__ == "__main__":
         "sampler": sampler,
         "log_path": full_path,
         "optimizer": optimizer,
-        "loss_fn": sdf_loss,
+        "loss_fn": sdf_sitzmann,
         "mc_resolution": parameter_dict["reconstruction"]["resolution"]
     }
 
@@ -300,14 +241,18 @@ if __name__ == "__main__":
     loss_df = pd.DataFrame.from_dict(losses)
     loss_df.to_csv(os.path.join(full_path, "losses.csv"), sep=";", index=None)
 
+    # saving the final model
+    torch.save(
+        model.state_dict(),
+        os.path.join(full_path, "models", "model_final.pth")
+    )
+
     # reconstructing the final mesh
     mesh_file = parameter_dict["reconstruction"]["output_file"] + ".ply"
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
-    decoder = SDFDecoder(
-        torch.load(os.path.join(full_path, "model_final.pth")),
-        n_in_features=3,
-        n_out_features=1,
-        hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
-        w0=parameter_dict["network"]["w0"]
+    create_mesh(
+        model,
+        os.path.join(full_path, "reconstructions", mesh_file),
+        N=mesh_resolution,
+        device=device
     )
-    create_mesh(decoder, os.path.join(full_path, mesh_file), N=mesh_resolution)

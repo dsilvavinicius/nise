@@ -16,7 +16,9 @@ def create_output_paths(checkpoint_path, experiment_name, overwrite=True):
     elif os.path.exists(full_path):
         warn("Output path exists. Not overwritting.")
         return full_path
-    os.makedirs(full_path)
+
+    os.makedirs(os.path.join(full_path, "models"))
+    os.makedirs(os.path.join(full_path, "reconstructions"))
     return full_path
 
 
