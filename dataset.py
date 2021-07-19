@@ -261,5 +261,5 @@ class PointCloud(Dataset):
         return {
             "coords": samples[:, :3].float(),
             "normals": samples[:, 3:6].float(),
-            "sdf": samples[:, -1].float()
+            "sdf": samples[:, -1].unsqueeze(-1).float()
         }
