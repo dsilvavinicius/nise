@@ -33,7 +33,9 @@ def train_model(dataset, model, device, train_config, silent=False):
     if sampler is not None:
         train_loader = DataLoader(
             dataset,
-            batch_sampler=BatchSampler(sampler, batch_size=BATCH_SIZE, drop_last=False)
+            batch_sampler=BatchSampler(sampler, batch_size=BATCH_SIZE, drop_last=False),
+            pin_memory=True,
+            num_workers=0
         )
     else:
         train_loader = DataLoader(
@@ -64,6 +66,13 @@ def train_model(dataset, model, device, train_config, silent=False):
     for epoch in range(EPOCHS):
         running_loss = dict()
         for i, data in enumerate(train_loader, start=0):
+            # If we have a custom sampler, we must reshape the Tensors from
+            # [B, N, D] to [1, B*N, D]
+            if sampler is not None:
+                for k, v in data.items():
+                    b, n, d = v.size()
+                    data[k] = v.reshape(1, -1, d)
+
             # get the inputs; data is a list of [inputs, labels]
             inputs = data["coords"].to(device)
             gt = {
@@ -183,6 +192,10 @@ if __name__ == "__main__":
     with open(os.path.join(full_path, "params.json"), "w+") as fout:
         json.dump(parameter_dict, fout, indent=4)
 
+    no_sampler = True
+    if "sampler" in sampling_config and sampling_config["sampler"]:
+        no_sampler = False
+
     dataset = PointCloud(
         os.path.join("data", parameter_dict["dataset"]),
         sampling_config["samples_on_surface"],
@@ -190,7 +203,7 @@ if __name__ == "__main__":
         off_surface_sdf=-1,
         off_surface_normals=np.array([-1, -1, -1]),
         random_surf_samples=sampling_config["random_surf_samples"],
-        no_sampler=True,
+        no_sampler=no_sampler,
         batch_size=parameter_dict["batch_size"],
         silent=False
     )

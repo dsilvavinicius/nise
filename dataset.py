@@ -135,9 +135,15 @@ class PointCloud(Dataset):
 
         self.samples_on_surface = samples_on_surface
         self.off_surface_sdf = off_surface_sdf
-        self.off_surface_normals = torch.from_numpy(off_surface_normals.astype(np.float32))
         self.no_sampler = no_sampler
         self.batch_size = batch_size
+
+        if off_surface_normals is None:
+            self.off_surface_normals = None
+        else:
+            self.off_surface_normals = torch.from_numpy(
+                off_surface_normals.astype(np.float32)
+            )
 
         if not silent:
             print(f"Loading mesh \"{mesh_path}\".")
@@ -178,7 +184,7 @@ class PointCloud(Dataset):
 
     def __len__(self):
         if self.no_sampler:
-            return self.samples_on_surface // self.batch_size
+            return 2 * self.samples_on_surface // self.batch_size
         return self.samples_on_surface
 
     def __getitem__(self, idx):
@@ -197,10 +203,13 @@ class PointCloud(Dataset):
                 sample = self.surface_samples[i, :]
             else:
                 sample = self.surface_samples[idx, :]
+                # Reshaping from [D] to [1, D] because to keep it uniform with
+                # other sampling approaches
+                sample = sample.unsqueeze(0)
             return {
-                "coords": sample[0, :3].float(),
-                "normals": sample[0, 3:6].float(),
-                "sdf": sample[0, -1].float(),
+                "coords": sample[:, :3].float(),
+                "normals": sample[:, 3:6].float(),
+                "sdf": sample[:, -1].unsqueeze(-1).float(),
             }
 
         # If the provided idx is out-of-range, we simply sample from the
@@ -209,11 +218,11 @@ class PointCloud(Dataset):
         if self.off_surface_sdf is not None:
             sample[0, -1] = self.off_surface_sdf
         if self.off_surface_normals is not None:
-            sample[0, 3:6] = torch.from_numpy(self.off_surface_normals)
+            sample[0, 3:6] = self.off_surface_normals
         return {
-            "coords": sample[0, :3].float(),
-            "normals": sample[0, 3:6].float(),
-            "sdf": sample[0, -1].float(),
+            "coords": sample[:, :3].float(),
+            "normals": sample[:, 3:6].float(),
+            "sdf": sample[:, -1].unsqueeze(-1).float(),
         }
 
     def _random_sampling(self, n_points):
@@ -248,8 +257,15 @@ class PointCloud(Dataset):
             if self.off_surface_normals is not None:
                 off_surface_samples[:, 3:6] = self.off_surface_normals
         else:
-            off_surface_sdf = np.full((off_surface_count, 1), self.off_surface_sdf, dtype=np.float32)
-            off_surface_normals = np.zeros((off_surface_count, 3), dtype=np.float32)
+            off_surface_sdf = np.full(
+                (off_surface_count, 1),
+                self.off_surface_sdf,
+                dtype=np.float32
+            )
+            off_surface_normals = np.zeros(
+                (off_surface_count, 3),
+                dtype=np.float32
+            )
             off_surface_samples = torch.from_numpy(np.hstack((
                 off_surface_points,
                 off_surface_normals,
@@ -258,6 +274,8 @@ class PointCloud(Dataset):
 
         samples = torch.cat((on_surface_samples, off_surface_samples), dim=0)
 
+        # Unsqueezing the SDF since it returns a shape [1] tensor and we need a
+        # [1, 1] shaped tensor.
         return {
             "coords": samples[:, :3].float(),
             "normals": samples[:, 3:6].float(),
