@@ -149,7 +149,7 @@ class PointCloud(Dataset):
             print(f"Loading mesh \"{mesh_path}\".")
 
         mesh = trimesh.load(mesh_path)
-        if scaling is not None:
+        if scaling is not None and scaling:
             if scaling == "bbox":
                 mesh = scale_to_unit_cube(mesh)
             elif scaling == "sphere":
