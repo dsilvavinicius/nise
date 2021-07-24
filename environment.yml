@@ -1,0 +1,15 @@
+name: i4d
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - PyOpenGL==3.1.0
+  - trimesh
+  - numpy
+  - pandas
+  - plyfile
+  - pytorch==1.5.0
+  - tensorboard
+  - pip
+  - pip:
+    - mesh-to-sdf
