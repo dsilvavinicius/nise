@@ -31,7 +31,7 @@ python main.py experiments/double_torus_toy.json
 tensorboard --logdir logs/double_torus_toy
 ```
 
-Alternatively, on Linux and macOS systems, steps 3-6 are implemented on the `Makefile` at the root of the project.
+Alternatively, on Linux and macOS systems, steps 4-6 are implemented on the `Makefile` at the root of the project.
 
 ## Citation
 If you find our work useful in your research, please cite:
