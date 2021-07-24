@@ -241,36 +241,21 @@ class PointCloud(Dataset):
         on_surface_samples = self.surface_samples[on_surface_idx, :]
 
         off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 3))
-        if self.off_surface_sdf is not None or self.off_surface_normals is not None:
-            off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
-                off_surface_points,
-                use_depth_buffer=False,
-                return_gradients=True
-            )
-            off_surface_samples = torch.from_numpy(np.hstack((
-                off_surface_points,
-                off_surface_normals,
-                off_surface_sdf[:, np.newaxis]
-            )).astype(np.float32))
-            if self.off_surface_sdf is not None:
-                off_surface_samples[:, -1] = self.off_surface_sdf
-            if self.off_surface_normals is not None:
-                off_surface_samples[:, 3:6] = self.off_surface_normals
-        else:
-            off_surface_sdf = np.full(
-                (off_surface_count, 1),
-                self.off_surface_sdf,
-                dtype=np.float32
-            )
-            off_surface_normals = np.zeros(
-                (off_surface_count, 3),
-                dtype=np.float32
-            )
-            off_surface_samples = torch.from_numpy(np.hstack((
-                off_surface_points,
-                off_surface_normals,
-                off_surface_sdf
-            )))
+        off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
+            off_surface_points,
+            use_depth_buffer=False,
+            return_gradients=True
+        )
+        off_surface_samples = torch.from_numpy(np.hstack((
+            off_surface_points,
+            off_surface_normals,
+            off_surface_sdf[:, np.newaxis]
+        )).astype(np.float32))
+
+        if self.off_surface_sdf is not None:
+            off_surface_samples[:, -1] = self.off_surface_sdf
+        if self.off_surface_normals is not None:
+            off_surface_samples[:, 3:6] = self.off_surface_normals
 
         samples = torch.cat((on_surface_samples, off_surface_samples), dim=0)
 
