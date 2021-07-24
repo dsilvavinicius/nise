@@ -8,7 +8,7 @@ dependencies:
   - numpy
   - pandas
   - plyfile
-  - pytorch==1.5.0
+  - pytorch==1.8.1
   - tensorboard
   - pip
   - pip:
