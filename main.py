@@ -199,7 +199,7 @@ if __name__ == "__main__":
     dataset = PointCloud(
         os.path.join("data", parameter_dict["dataset"]),
         sampling_config["samples_on_surface"],
-        scaling=None,
+        scaling=parameter_dict["scaling"],
         off_surface_sdf=-1,
         off_surface_normals=np.array([-1, -1, -1]),
         random_surf_samples=sampling_config["random_surf_samples"],

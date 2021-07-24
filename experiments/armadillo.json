@@ -1,12 +1,13 @@
 {
-    "description": "Simple experiment to test the learning pipeline.",
+    "description": "SIREN Learning of the Armadillo mesh.",
     "num_epochs": 1000,
     "sampling_opts": {
-        "samples_on_surface": 100000,
-        "samples_off_surface": 100000,
+        "samples_on_surface": 50000,
+        "samples_off_surface": 50000,
         "random_surf_samples": true,
         "sampler": false
     },
+    "scaling": "bbox",
     "dataset": "armadillo.ply",
     "batch_size": 10000,
     "checkpoint_path": "logs",
@@ -15,14 +16,14 @@
     "epochs_to_reconstruction": 10,
     "optimizer": {
         "type": "adam",
-        "lr": 1e-3
+        "lr": 1e-4
     },
     "reconstruction": {
         "resolution": 128,
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [128, 128, 128],
-        "w0": 30
+        "hidden_layer_nodes": [256, 256, 256],
+        "w0": 60
     }
 }

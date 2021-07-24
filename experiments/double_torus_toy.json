@@ -7,6 +7,7 @@
         "random_surf_samples": true,
         "sampler": false
     },
+    "scaling": "",
     "dataset": "double_torus.ply",
     "batch_size": 1024,
     "checkpoint_path": "logs",
