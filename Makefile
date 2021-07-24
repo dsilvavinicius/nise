@@ -14,4 +14,7 @@ logs/double_torus_toy/reconstructions/final.ply: data/double_torus.ply
 meshlab: logs/double_torus_toy/reconstructions/final.ply
 	@meshlab logs/double_torus_toy/reconstructions/final.ply
 
-.PHONY: all clean meshlab
+conda-env:
+	@conda env create -f environment.yml
+
+.PHONY: all clean meshlab conda-env
