@@ -9,6 +9,8 @@
     },
     "scaling": "",
     "dataset": "double_torus.ply",
+    "off_surface_sdf": -1,
+    "off_surface_normals": [-1, -1, -1],
     "batch_size": 1024,
     "checkpoint_path": "logs",
     "experiment_name": "double_torus_toy",

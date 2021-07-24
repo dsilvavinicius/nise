@@ -197,12 +197,19 @@ if __name__ == "__main__":
     if "sampler" in sampling_config and sampling_config["sampler"]:
         no_sampler = False
 
+    off_surface_sdf = parameter_dict.get("off_surface_sdf")
+    off_surface_normals = parameter_dict.get("off_surface_normals")
+    if off_surface_normals is not None:
+        off_surface_normals = np.array(off_surface_normals)
+
+    scaling = parameter_dict.get("scaling")
+
     dataset = PointCloud(
         os.path.join("data", parameter_dict["dataset"]),
         sampling_config["samples_on_surface"],
-        scaling=parameter_dict["scaling"],
-        off_surface_sdf=-1,
-        off_surface_normals=np.array([-1, -1, -1]),
+        scaling=scaling,
+        off_surface_sdf=off_surface_sdf,
+        off_surface_normals=off_surface_normals,
         random_surf_samples=sampling_config["random_surf_samples"],
         no_sampler=no_sampler,
         batch_size=parameter_dict["batch_size"],
@@ -210,7 +217,8 @@ if __name__ == "__main__":
     )
 
     sampler = None
-    if "sampler" in sampling_config and sampling_config["sampler"] == "sitzmann":
+    sampler_opt = sampling_config.get("sampler")
+    if sampler_opt is not None and sampler_opt == "sitzmann":
         sampler = SitzmannSampler(
             dataset,
             sampling_config["samples_off_surface"]
