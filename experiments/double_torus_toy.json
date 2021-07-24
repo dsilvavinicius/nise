@@ -14,9 +14,10 @@
     "experiment_name": "double_torus_toy",
     "epochs_to_checkpoint": 10,
     "epochs_to_reconstruction": 10,
+    "loss": "sitzmann",
     "optimizer": {
         "type": "adam",
-        "lr": 1e-3
+        "lr": 1e-4
     },
     "reconstruction": {
         "resolution": 128,

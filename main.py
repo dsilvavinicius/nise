@@ -232,6 +232,15 @@ if __name__ == "__main__":
             params=model.parameters()
         )
 
+    loss = parameter_dict.get("loss")
+    if loss is not None and loss:
+        if loss == "sitzmann":
+            loss_fn = sdf_sitzmann
+        elif loss == "true_sdf":
+            loss_fn = true_sdf_off_surface
+        else:
+            warnings.warn(f"Invalid loss function option {loss}. Using default.")
+
     config_dict = {
         "epochs": parameter_dict["num_epochs"],
         "batch_size": parameter_dict["batch_size"],
@@ -240,7 +249,7 @@ if __name__ == "__main__":
         "sampler": sampler,
         "log_path": full_path,
         "optimizer": optimizer,
-        "loss_fn": sdf_sitzmann,
+        "loss_fn": loss_fn,
         "mc_resolution": parameter_dict["reconstruction"]["resolution"]
     }
 
