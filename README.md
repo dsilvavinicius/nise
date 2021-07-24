@@ -5,7 +5,7 @@ Morphing and animation of implicit surfaces.
 
 ### Prerequisites
 
-1. Python 3.7+
+1. Anaconda
 2. Git
 3. MeshLab
 
@@ -15,11 +15,10 @@ If using Linux, or macOS, these programs should be available through the package
 
 1. Clone this repository: `git clone git@github.com:dsilvavinicius/i4d.git`
 2. Enter project folder: `cd i4d`
-3. Setup project dependencies via conda or pip+venv
+3. Setup project dependencies via conda
 ```
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate i4d
 ```
 4. Download the [Double Torus Mesh](https://drive.google.com/file/d/11PkscMHBUkkENhHfI1lpH5Dh6X9f2028/view?usp=sharing) into the `data` folder in the repository
 5. Run the main script passing the pipeline test configuration file as input
@@ -32,7 +31,7 @@ python main.py experiments/double_torus_toy.json
 tensorboard --logdir logs/double_torus_toy
 ```
 
-Alternatively, on Linux and macOS systems, steps 3-6 are implemented on the `Makefile` at the root of the project.
+Alternatively, on Linux and macOS systems, steps 4-6 are implemented on the `Makefile` at the root of the project.
 
 ## Citation
 If you find our work useful in your research, please cite:

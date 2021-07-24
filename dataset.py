@@ -200,7 +200,7 @@ class PointCloud(Dataset):
                     size=1,
                     replace=False
                 )
-                sample = self.surface_samples[i, :]
+                sample = self.surface_samples[i, :] # (Tiago) why is sample not unsqueezed? like in line 208
             else:
                 sample = self.surface_samples[idx, :]
                 # Reshaping from [D] to [1, D] because to keep it uniform with
