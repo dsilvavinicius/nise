@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import warnings
 import numpy as np
 import pandas as pd
 import torch
@@ -11,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_sitzmann
+from loss import sdf_sitzmann, true_sdf_off_surface
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
