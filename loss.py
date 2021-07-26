@@ -4,6 +4,51 @@ import torch
 from torch.functional import F
 from util import gradient
 
+def on_surface_sdf_constraint(gt_sdf, pred_sdf):
+    return torch.where(
+           gt_sdf == 0,
+           torch.abs(pred_sdf),
+           torch.zeros_like(pred_sdf)
+        )
+
+def off_surface_sdf_constraint(gt_sdf, pred_sdf):
+    """
+    This function forces gt_sdf and pred_sdf to be equals
+    """
+    return torch.where(
+           gt_sdf != 0,
+           (gt_sdf - pred_sdf) ** 2,
+           torch.zeros_like(pred_sdf)
+        )
+
+def off_surface_without_sdf_constraint(gt_sdf, pred_sdf, radius=1e2):
+    """
+    This function penalizes the pred_sdf of points in gt_sdf!=0
+    """
+    return torch.where(
+           gt_sdf != -1,
+           torch.zeros_like(pred_sdf),
+           torch.exp(-radius * torch.abs(pred_sdf))
+        )
+
+def eikonal_constraint(grad):
+    """
+    This function forces the gradient of the sdf to be unitary: Eikonal Equation
+    """
+    return (grad.norm(dim=-1) - 1.) ** 2
+    #return torch.abs(grad.norm(dim=-1) - 1)
+
+def on_surface_normal_constraint(gt_sdf, gt_normals, grad):
+    """
+    This function return a number that measure how far gt_normals
+    and grad are aligned in the zero-level set of sdf.
+    """
+    return torch.where(
+           gt_sdf == 0,
+           1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+           torch.zeros_like(grad[..., :1])
+    )
+
 
 def sdf_sitzmann(X, gt):
     """Loss function employed in Sitzmann et al. for SDF experiments [1].
@@ -36,25 +81,17 @@ def sdf_sitzmann(X, gt):
     pred_sdf = X["model_out"]
 
     grad = gradient(pred_sdf, coords)
-    sdf_constraint = torch.where(
-        gt_sdf != -1,
-        pred_sdf,
-        torch.zeros_like(pred_sdf)
-    )
-    inter_constraint = torch.where(
-        gt_sdf != -1,
-        torch.zeros_like(pred_sdf),
-        torch.exp(-1e2 * torch.abs(pred_sdf))
-    )
-    normal_constraint = torch.where(
-        gt_sdf != -1,
-        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-        torch.zeros_like(grad[..., :1])
-    )
 
-    grad_constraint = torch.abs(grad.norm(dim=-1) - 1)
+    # Initial-boundary constraints
+    sdf_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    inter_constraint = off_surface_without_sdf_constraint(gt_sdf, pred_sdf)
+    normal_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    
+    #PDE constraints
+    grad_constraint = eikonal_constraint(grad)
+
     return {
-        "sdf_constraint": torch.abs(sdf_constraint).mean() * 3e3,
+        "sdf_constraint": sdf_constraint.mean() * 3e3,
         "inter_constraint": inter_constraint.mean() * 1e2,
         "normal_constraint": normal_constraint.mean() * 1e2,
         "grad_constraint": grad_constraint.mean() * 5e1,
@@ -91,21 +128,13 @@ def sdf_eikonal_level0(X, gt):
     pred_sdf = X["model_out"]
 
     grad = gradient(pred_sdf, coords)
-    sdf_constraint = torch.where(
-        gt_sdf != -1,
-        pred_sdf,
-        torch.zeros_like(pred_sdf)
-    )
-    inter_constraint = torch.where(
-        gt_sdf != -1,
-        torch.zeros_like(pred_sdf),
-        torch.exp(-1e2 * torch.abs(pred_sdf))
-    )
-    normal_constraint = torch.where(
-        gt_sdf != -1,
-        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-        torch.zeros_like(grad[..., :1])
-    )
+
+    # Initial-boundary constraints
+    sdf_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    inter_constraint = off_surface_without_sdf_constraint(gt_sdf, pred_sdf)
+    normal_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    
+    # PDE constraint on the zero-level set
     grad_norm = grad.norm(dim=-1).unsqueeze(-1)
     grad_constraint = torch.where(
         gt_sdf != -1,
@@ -114,7 +143,7 @@ def sdf_eikonal_level0(X, gt):
     )
 
     return {
-        "sdf_constraint": torch.abs(sdf_constraint).mean() * 3e3,
+        "sdf_constraint": sdf_constraint.mean() * 3e3,
         "inter_constraint": inter_constraint.mean() * 1e2,
         "normal_constraint": normal_constraint.mean() * 1e2,
         "grad_constraint": grad_constraint.mean() * 5e1,
@@ -147,25 +176,15 @@ def true_sdf_off_surface(X, gt):
     grad = gradient(pred_sdf, coords)
     # Wherever boundary_values is not equal to zero, we interpret it as a
     # boundary constraint.
-    sdf_constraint_on_surf = torch.where(
-        gt_sdf == 0,
-        pred_sdf,
-        torch.zeros_like(pred_sdf)
-    )
-    sdf_constraint_off_surf = torch.where(
-        gt_sdf != 0,
-        (gt_sdf - pred_sdf) ** 2,
-        torch.zeros_like(pred_sdf)
-    )
-    normal_constraint = torch.where(
-        gt_sdf == 0,
-        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-        torch.zeros_like(grad[..., :1])
-    )
-    grad_constraint = (grad.norm(dim=-1) - 1.) ** 2
+    sdf_constraint_on_surf = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    sdf_constraint_off_surf = off_surface_sdf_constraint(gt_sdf, pred_sdf)
+    normal_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    
+    # PDE constraint 
+    grad_constraint = eikonal_constraint(grad)
 
     return {
-        "sdf_on_surf": (sdf_constraint_on_surf ** 2).mean() * 3e3,
+        "sdf_on_surf": sdf_constraint_on_surf.mean() * 3e3,
         "sdf_off_surf": sdf_constraint_off_surf.mean() * 1e2,
         "normal_constraint": normal_constraint.mean() * 1e1,
         "grad_constraint": grad_constraint.mean() * 1e1
