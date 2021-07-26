@@ -168,16 +168,23 @@ def train_model(dataset, model, device, train_config, silent=False):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage="python main.py path_to_experiments")
-    p.add_argument(
-        "experiment_path",
-        help="Path to the JSON experiment description file"
-    )
+    
+    time = False # consider the spacetime (x,y,z,t) as domain 
+    n_in_features = 3 # implicit 3D models
+    if time:
+        n_in_features = 4 # used to animate implicit 3D models
+
+    experiment_path = "experiments/double_torus_toy.json"
+    # p.add_argument(
+    #     "experiment_path",
+    #     help="Path to the JSON experiment description file"
+    # )
     p.add_argument(
         "-s", "--silent", action="store_true",
         help="Suppresses informational output messages"
     )
     args = p.parse_args()
-    parameter_dict = load_experiment_parameters(args.experiment_path)
+    parameter_dict = load_experiment_parameters(experiment_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -226,7 +233,7 @@ if __name__ == "__main__":
 
     hidden_layers = parameter_dict["network"]["hidden_layer_nodes"]
     model = SIREN(
-        n_in_features=3,
+        n_in_features,
         n_out_features=1,
         hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
         w0=parameter_dict["network"]["w0"]
@@ -283,6 +290,7 @@ if __name__ == "__main__":
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
     create_mesh(
         model,
+        #0,# time instant for 4d SIREN function
         os.path.join(full_path, "reconstructions", mesh_file),
         N=mesh_resolution,
         device=device

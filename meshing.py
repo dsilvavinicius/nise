@@ -12,6 +12,7 @@ import torch
 def create_mesh(
     decoder,
     filename="",
+    t=-1, #time=-1 means we are only in the space
     N=256,
     max_batch=64 ** 3,
     offset=None,
@@ -26,7 +27,14 @@ def create_mesh(
     voxel_size = 2.0 / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
-    samples = torch.zeros(N ** 3, 4, device=device)
+    
+    sdf_coord = 3
+    if (t!=-1):
+        sdf_coord = 4
+
+    # (x,y,z,sdf) if we are not considering time
+    # (x,y,z,t,sdf) otherwise
+    samples = torch.zeros(N ** 3, sdf_coord + 1, device=device)
 
     # transform first 3 columns
     # to be the x, y, z index
@@ -41,15 +49,20 @@ def create_mesh(
     samples[:, 2] = (samples[:, 2] * voxel_size) + voxel_origin[0]
     samples.requires_grad = False
 
+    #adding the time
+    if(t!=-1):
+        samples[:, sdf_coord-1] = t
+
+
     num_samples = N ** 3
     head = 0
 
     start = time.time()
     while head < num_samples:
         print(head)
-        sample_subset = samples[head:min(head + max_batch, num_samples), 0:3]
+        sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
 
-        samples[head:min(head + max_batch, num_samples), 3] = (
+        samples[head:min(head + max_batch, num_samples), sdf_coord] = (
             decoder(sample_subset)["model_out"]
             .squeeze()
             .detach()
@@ -57,7 +70,7 @@ def create_mesh(
         )
         head += max_batch
 
-    sdf_values = samples[:, 3]
+    sdf_values = samples[:, sdf_coord]
     sdf_values = sdf_values.reshape(N, N, N)
 
     end = time.time()

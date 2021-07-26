@@ -120,7 +120,6 @@ def sdf_eikonal_level0(X, gt):
         "grad_constraint": grad_constraint.mean() * 5e1,
     }
 
-
 def true_sdf_off_surface(X, gt):
     """Loss function to use when the true SDF value is available.
 
