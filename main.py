@@ -9,15 +9,15 @@ import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import PointCloud
+from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_sitzmann, true_sdf_off_surface
+from loss import sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
 
-def train_model(dataset, model, device, train_config, silent=False):
+def train_model(dataset, model, device, train_config, space_time=False, silent=False):
     BATCH_SIZE = train_config["batch_size"]
     EPOCHS = train_config["epochs"]
     EPOCHS_TIL_CHECKPOINT = 0
@@ -98,7 +98,11 @@ def train_model(dataset, model, device, train_config, silent=False):
                     running_loss[it] += l.item()
 
             # Adding an iteration of the training data to tensorboard
-            colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
+            if space_time:
+                colors = torch.zeros_like(data["coords"][:,:,0:3], device="cpu", requires_grad=False)
+            else:
+                colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
+            
             colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
             colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
             colors[data["sdf"].squeeze(-1) > 0, :] = torch.Tensor([0, 0, 255])
@@ -141,12 +145,27 @@ def train_model(dataset, model, device, train_config, silent=False):
 
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
-            verts, _, normals, _ = create_mesh(
-                model,
-                filename=os.path.join(full_path, "reconstructions", mesh_file),
-                N=mesh_resolution,
-                device=device
-            )
+            
+            if space_time:
+                N = 6    # number of samples of the interval time [0,1]
+                for i in range(N):
+                    T = (i-N/2)/(2*N-1)
+                    mesh_file = f"epoch_{epoch}_time_{T}.ply"
+                    verts, _, normals, _ = create_mesh(
+                        model,
+                        filename=os.path.join(full_path, "reconstructions", mesh_file), 
+                        t=T,  # time instant for 4d SIREN function
+                        N=mesh_resolution,
+                        device=device
+                    )
+            else:
+                verts, _, normals, _ = create_mesh(
+                    model,
+                    filename=os.path.join(full_path, "reconstructions", mesh_file),
+                    N=mesh_resolution,
+                    device=device
+                )
+
             if normals.strides[1] < 0:
                 normals = normals[:, ::-1]
             verts = torch.from_numpy(verts).unsqueeze(0)
@@ -169,22 +188,19 @@ def train_model(dataset, model, device, train_config, silent=False):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage="python main.py path_to_experiments")
     
-    time = False # consider the spacetime (x,y,z,t) as domain 
-    n_in_features = 3 # implicit 3D models
-    if time:
-        n_in_features = 4 # used to animate implicit 3D models
-
-    experiment_path = "experiments/double_torus_toy.json"
-    # p.add_argument(
-    #     "experiment_path",
-    #     help="Path to the JSON experiment description file"
-    # )
+    #experiment_path = "experiments/double_torus_toy.json"
+    #experiment_path = "experiments/armadillo.json"
+    #experiment_path = "experiments/cube_time_0.json"
+    p.add_argument(
+        "experiment_path",
+        help="Path to the JSON experiment description file"
+    )
     p.add_argument(
         "-s", "--silent", action="store_true",
         help="Suppresses informational output messages"
     )
     args = p.parse_args()
-    parameter_dict = load_experiment_parameters(experiment_path)
+    parameter_dict = load_experiment_parameters(args.experiment_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -196,12 +212,17 @@ if __name__ == "__main__":
         overwrite=False
     )
 
+    space_time = parameter_dict.get("space_time")  # consider the spacetime (x,y,z,t) as domain
+    n_in_features = 3  # implicit 3D models
+    if space_time:
+        n_in_features = 4  # used to animate implicit 3D models
+
     # Saving the parameters to the output path
     with open(os.path.join(full_path, "params.json"), "w+") as fout:
         json.dump(parameter_dict, fout, indent=4)
 
     no_sampler = True
-    if "sampler" in sampling_config and sampling_config["sampler"]:
+    if sampling_config.get("sampler"):
         no_sampler = False
 
     off_surface_sdf = parameter_dict.get("off_surface_sdf")
@@ -211,17 +232,31 @@ if __name__ == "__main__":
 
     scaling = parameter_dict.get("scaling")
 
-    dataset = PointCloud(
-        os.path.join("data", parameter_dict["dataset"]),
-        sampling_config["samples_on_surface"],
-        scaling=scaling,
-        off_surface_sdf=off_surface_sdf,
-        off_surface_normals=off_surface_normals,
-        random_surf_samples=sampling_config["random_surf_samples"],
-        no_sampler=no_sampler,
-        batch_size=parameter_dict["batch_size"],
-        silent=False
-    )
+    dataset = None
+    if space_time:
+        dataset = SpaceTimePointCloud(
+            os.path.join("data", parameter_dict["dataset"]),
+            sampling_config["samples_on_surface"],
+            scaling=scaling,
+            off_surface_sdf=off_surface_sdf,
+            off_surface_normals=off_surface_normals,
+            random_surf_samples=sampling_config["random_surf_samples"],
+            no_sampler=no_sampler,
+            batch_size=parameter_dict["batch_size"],
+            silent=False
+        )
+    else:
+        dataset = PointCloud(
+            os.path.join("data", parameter_dict["dataset"]),
+            sampling_config["samples_on_surface"],
+            scaling=scaling,
+            off_surface_sdf=off_surface_sdf,
+            off_surface_normals=off_surface_normals,
+            random_surf_samples=sampling_config["random_surf_samples"],
+            no_sampler=no_sampler,
+            batch_size=parameter_dict["batch_size"],
+            silent=False
+        )
 
     sampler = None
     sampler_opt = sampling_config.get("sampler")
@@ -251,7 +286,10 @@ if __name__ == "__main__":
     loss = parameter_dict.get("loss")
     if loss is not None and loss:
         if loss == "sitzmann":
-            loss_fn = sdf_sitzmann
+            if space_time:
+                loss_fn = sdf_sitzmann_time
+            else:    
+                loss_fn = sdf_sitzmann
         elif loss == "true_sdf":
             loss_fn = true_sdf_off_surface
         else:
@@ -274,6 +312,7 @@ if __name__ == "__main__":
         model,
         device,
         config_dict,
+        space_time,
         silent=args.silent
     )
     loss_df = pd.DataFrame.from_dict(losses)
@@ -288,10 +327,19 @@ if __name__ == "__main__":
     # reconstructing the final mesh
     mesh_file = parameter_dict["reconstruction"]["output_file"] + ".ply"
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
-    create_mesh(
-        model,
-        #0,# time instant for 4d SIREN function
-        os.path.join(full_path, "reconstructions", mesh_file),
-        N=mesh_resolution,
-        device=device
-    )
+    
+    if space_time:
+        create_mesh(
+            model,
+            os.path.join(full_path, "reconstructions", mesh_file),
+            0,  # time instant for 4d SIREN function
+            N=mesh_resolution,
+            device=device
+        )
+    else: 
+        create_mesh(
+            model,
+            os.path.join(full_path, "reconstructions", mesh_file),
+            N=mesh_resolution,
+            device=device
+        )

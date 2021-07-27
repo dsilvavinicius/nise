@@ -26,7 +26,7 @@ def off_surface_without_sdf_constraint(gt_sdf, pred_sdf, radius=1e2):
     This function penalizes the pred_sdf of points in gt_sdf!=0
     """
     return torch.where(
-           gt_sdf != -1,
+           gt_sdf == 0,
            torch.zeros_like(pred_sdf),
            torch.exp(-radius * torch.abs(pred_sdf))
         )
@@ -188,4 +188,53 @@ def true_sdf_off_surface(X, gt):
         "sdf_off_surf": sdf_constraint_off_surf.mean() * 1e2,
         "normal_constraint": normal_constraint.mean() * 1e1,
         "grad_constraint": grad_constraint.mean() * 1e1
+    }
+
+
+def sdf_sitzmann_time(X, gt):
+    """Loss function employed in Sitzmann et al. for SDF experiments [1].
+
+    Parameters
+    ----------
+    X: dict[str=>torch.Tensor]
+        Model output with the following keys: 'model_in' and 'model_out'
+        with the model input and SDF values respectively.
+
+    gt: dict[str=>torch.Tensor]
+        Ground-truth data with the following keys: 'sdf' and 'normals', with
+        the actual SDF values and the input data normals, respectively.
+
+    Returns
+    -------
+    loss: dict[str=>torch.Tensor]
+        The calculated loss values for each constraint.
+
+    References
+    ----------
+    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
+    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
+    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
+    """
+    gt_sdf = gt["sdf"]
+    gt_normals = gt["normals"]
+    
+    coords = X["model_in"]
+    pred_sdf = X["model_out"]
+
+    grad = gradient(pred_sdf, coords)[:,:,0:3]
+    #print (grad.shape)
+
+    # Initial-boundary constraints of the Eikonal equation
+    sdf_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    inter_constraint = off_surface_without_sdf_constraint(gt_sdf, pred_sdf)
+    normal_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+
+    # PDE constraints
+    grad_constraint = eikonal_constraint(grad)
+
+    return {
+        "sdf_constraint": sdf_constraint.mean() * 3e3,
+        "inter_constraint": inter_constraint.mean() * 1e2,
+        "normal_constraint": normal_constraint.mean() * 1e2,
+        "grad_constraint": grad_constraint.mean() * 5e1,
     }
