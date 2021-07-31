@@ -147,9 +147,10 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 6    # number of samples of the interval time [0,1]
+                N = 8    # number of samples of the interval time [0,1]
                 for i in range(N):
-                    T = (i-N/2)/(2*N-1)
+                    #T = 0.08*(i)/(N-1)
+                    T = 2*(i-N/2)/(N-1)
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,

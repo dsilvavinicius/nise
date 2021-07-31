@@ -3,18 +3,18 @@
     "space_time": true,
     "num_epochs": 1000,
     "sampling_opts": {
-        "samples_on_surface": 40000,
-        "samples_off_surface": 40000,
+        "samples_on_surface": 32000,
+        "samples_off_surface": 32000,
         "random_surf_samples": true,
         "sampler": false
     },
     "scaling": "",
-    "dataset": "cube.ply",
+    "dataset": "sphere.ply",
     "off_surface_sdf": -1,
     "off_surface_normals": [-1, -1, -1],
-    "batch_size": 5000,
+    "batch_size": 16000,
     "checkpoint_path": "logs",
-    "experiment_name": "cube_morphing",
+    "experiment_name": "sphere_transport",
     "epochs_to_checkpoint": 10,
     "epochs_to_reconstruction": 10,
     "loss": "sitzmann",
@@ -27,7 +27,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [32, 32],
+        "hidden_layer_nodes": [128, 128,128],
         "w0": 10
     }
 }

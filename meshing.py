@@ -59,7 +59,7 @@ def create_mesh(
 
     start = time.time()
     while head < num_samples:
-        print(head)
+        #print(head)
         sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
 
         samples[head:min(head + max_batch, num_samples), sdf_coord] = (
@@ -116,10 +116,16 @@ def convert_sdf_samples_to_ply(
     """
     numpy_3d_sdf_tensor = pytorch_3d_sdf_tensor.numpy()
 
-    # verts, faces, normals, values = np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0)
-    verts, faces, normals, values = marching_cubes(
-        numpy_3d_sdf_tensor, level=0.0, spacing=[voxel_size] * 3
-    )
+    verts, faces, normals, values = np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0)
+
+    # Check if the cubes contains the zero-level set
+    level = 0.0
+    if level < numpy_3d_sdf_tensor.min() or level > numpy_3d_sdf_tensor.max():
+        print(f"Surface level must be within volume data range.")
+    else:
+        verts, faces, normals, values = marching_cubes(
+            numpy_3d_sdf_tensor, level, spacing=[voxel_size] * 3
+        )
 
     # transform from voxel coordinates to camera coordinates
     # note x and y are flipped in the output of marching_cubes

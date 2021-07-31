@@ -5,7 +5,7 @@ import os
 import shutil
 from warnings import warn
 import torch
-
+from torch.autograd import grad
 
 def create_output_paths(checkpoint_path, experiment_name, overwrite=True):
     """Helper function to create the output folders. Returns the resulting path.
@@ -31,6 +31,11 @@ def load_experiment_parameters(parameters_path):
         return {}
     return parameter_dict
 
+def divergence(y, x):
+    div = 0.
+    for i in range(y.shape[-1]):
+        div += grad(y[..., i], x, torch.ones_like(y[..., i]), create_graph=True)[0][..., i:i+1]
+    return div
 
 def gradient(y, x, grad_outputs=None):
     """Gradient of `y` with respect to `x`
