@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time
+from loss import sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -147,10 +147,11 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 8    # number of samples of the interval time [0,1]
+                N = 4    # number of samples of the interval time [0,1]
                 for i in range(N):
                     #T = 0.08*(i)/(N-1)
-                    T = 2*(i-N/2)/(N-1)
+                    pi = 3.14159265359/4
+                    T = pi*(i)/(N-1)
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -288,11 +289,14 @@ if __name__ == "__main__":
     if loss is not None and loss:
         if loss == "sitzmann":
             if space_time:
-                loss_fn = sdf_sitzmann_time
+                loss_fn = sdf_sitzmann_time   
             else:    
                 loss_fn = sdf_sitzmann
-        elif loss == "true_sdf":
-            loss_fn = true_sdf_off_surface
+        elif loss == "true_sdf":  
+            if space_time:
+                loss_fn = sdf_time
+            else:    
+                loss_fn = true_sdf_off_surface
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 
