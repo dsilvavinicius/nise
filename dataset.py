@@ -273,16 +273,12 @@ class SpaceTimePointCloud(Dataset):
 
     Parameters
     ----------
-    mesh_path: str
-        Path to the base mesh.
+    mesh_paths: list of tuples[str, number]
+        Paths to the base meshes. Each item in this list is a tuple with the
+        mesh path and its time.
 
     samples_on_surface: int
         Number of surface samples to fetch (i.e. {X | f(X) = 0}).
-
-    scaling: str or None, optional
-        The scaling to apply to the mesh. Possible values are: None
-        (no scaling), "bbox" (-1, 1 in all axes), "sphere" (to fit the mesh in
-        an unit sphere). Default is None.
 
     off_surface_sdf: number, optional
         Value to replace the SDF calculated by the sampling function for points
@@ -295,19 +291,6 @@ class SpaceTimePointCloud(Dataset):
         points with SDF != 0. May be used to replicate the behavior of Sitzmann
         et al. If set to `None` (default) uses the SDF estimated by the
         sampling function.
-
-    random_surf_samples: boolean, optional
-        Wheter to randomly return points on surface (SDF=0) on `__getitem__`.
-        If set to False (default), will return the specified point. Otherwise,
-        `__getitem__` will return a randomly selected point, even if the same
-        `idx` is provided.
-
-    no_sampler: boolean, optional
-        When this option is True, we assume that no sampler will be provided to
-        the DataLoader, meaning that our `__getitem__` will return a batch of
-        points instead of a single point, mimicking the behavior of Sitzmann
-        et al. [1]. Default is False, meaning that an external sampler will be
-        used.
 
     batch_size: integer, optional
         Only used when `no_sampler` is `True`. Used for fetching `batch_size`
@@ -322,22 +305,15 @@ class SpaceTimePointCloud(Dataset):
     --------
     trimesh.load, mesh_to_sdf.get_surface_point_cloud, _sample_domain,
     _sample_on_surface
-
-    References
-    ----------
-    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
-    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
-    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
     """
-    def __init__(self, mesh_path, samples_on_surface, scaling=None,
-                 off_surface_sdf=None, off_surface_normals=None,
-                 random_surf_samples=False, no_sampler=False, batch_size=0,
+    def __init__(self, mesh_paths, samples_on_surface, scaling=None,
+                 off_surface_sdf=None, off_surface_normals=None, batch_size=0,
                  silent=False):
         super().__init__()
 
         self.samples_on_surface = samples_on_surface
         self.off_surface_sdf = off_surface_sdf
-        self.no_sampler = no_sampler
+        self.no_sampler = True
         self.batch_size = batch_size
 
         if off_surface_normals is None:
@@ -347,106 +323,57 @@ class SpaceTimePointCloud(Dataset):
                 off_surface_normals.astype(np.float32)
             )
 
-        if not silent:
-            print(f"Loading mesh \"{mesh_path}\".")
+        # This is a mode-3 tensor that will hold our surface samples for all
+        # given meshes. This tensor's shape is [N, 8, T], where N is the number
+        # of points of each mesh, 8 for the features (x, y, z, t, nx, ny, nz,
+        # sdf) and, T is the number of timesteps.
+        self.surface_samples = torch.zeros(samples_on_surface, 8, len(mesh_paths))
 
-        mesh = trimesh.load(mesh_path)
-        if scaling is not None and scaling:
-            if scaling == "bbox":
-                mesh = scale_to_unit_cube(mesh)
-            elif scaling == "sphere":
-                mesh = scale_to_unit_sphere(mesh)
-            else:
-                raise ValueError("Invalid scaling option.")
+        self.point_clouds = dict()
+        for mesh_path in mesh_paths:
+            path, t = mesh_path
+            if not silent:
+                print(f"Loading mesh \"{path}\" at time {t}.")
+            mesh = trimesh.load(path)
 
-        self.mesh = mesh
-        if not silent:
-            print("Creating point-cloud and acceleration structures.")
+            if not silent:
+                print(f"Creating point-cloud and acceleration structures for time {t}.")
 
-        self.point_cloud = get_surface_point_cloud(
-            mesh,
-            surface_point_method="scan",
-            bounding_radius=1,
-            calculate_normals=True
-        )
+            self.point_clouds[t] = get_surface_point_cloud(
+                mesh,
+                surface_point_method="scan",
+                bounding_radius=1,
+                calculate_normals=True
+            )
 
-        # We will fetch random samples at every access.
-        self.random_surf_samples = random_surf_samples
-        if not silent:
-            print("Sampling surface.")
+            # We will fetch random samples at every access.
+            if not silent:
+                print(f"Sampling surface at time {t}.")
 
-        self.surface_samples = _sample_on_surface(
-            mesh,
-            samples_on_surface,
-            sample_vertices=True
-        )
+            surface_samples = _sample_on_surface(
+                mesh,
+                samples_on_surface,
+                sample_vertices=True
+            )
+            self.surface_samples[:, :3, t] = surface_samples[..., :3]
+            self.surface_samples[:, 3, t] = t
+            self.surface_samples[:, 4:, t] = surface_samples[..., 3:]
+
+            if not silent:
+                print(f"Done for time {t}.")
 
         if not silent:
             print("Done preparing the dataset.")
 
     def __len__(self):
         if self.no_sampler:
-            return 2 * self.samples_on_surface // self.batch_size
+            return 3 * self.samples_on_surface // self.batch_size
         return self.samples_on_surface
 
     def __getitem__(self, idx):
         if self.no_sampler:
             return self._random_sampling(self.batch_size)
-
         raise NotImplementedError
-
-        # Not tested with external samplers yet
-        coords = []
-        normals = []
-        sdf =[]
-
-        # For indices of points-on-surface, we select and return a point with
-        # sdf=0.
-        if idx in range(self.samples_on_surface):
-            if self.random_surf_samples:
-                i = np.random.choice(
-                    range(self.samples_on_surface),
-                    size=1,
-                    replace=False
-                )
-                sample = self.surface_samples[i, :]
-            else:
-                sample = self.surface_samples[idx, :]
-                # Reshaping from [D] to [1, D] because to keep it uniform with
-                # other sampling approaches
-                sample = sample.unsqueeze(0)
-
-                print(sample[:, :3].shape)
-                print(sample[:, 0].shape)
-                coords = torch.cat((sample[:, :3],torch.zeros_like(sample[:,0])),dim=1) #(x,y,z,t=0)
-                normals = sample[:, 3:6]
-                sdf = sample[:, -1].unsqueeze(-1)
-
-                return {
-                    "coords": coords.float(),
-                    "normals": normals.float(),
-                    "sdf": sdf.float(),
-            }
-
-        # If the provided idx is out-of-range, we simply sample from the
-        # domain.
-        sample = _sample_domain(self.point_cloud, 1)
-        if self.off_surface_sdf is not None:
-            sample[0, -1] = self.off_surface_sdf
-        if self.off_surface_normals is not None:
-            sample[0, 3:6] = self.off_surface_normals
-
-        print(sample[:, :3].shape)
-        print(sample[:, 0].shape)
-        coords = torch.cat((sample[:, :3],torch.zeros_like(sample[:,0])),dim=1) #(x,y,z,t=0)
-        normals = sample[:, 3:6]
-        sdf = sample[:, -1].unsqueeze(-1)
-
-        return {
-            "coords": coords.float(),
-            "normals": normals.float(),
-            "sdf": sdf.float(),
-        }
 
     def _random_sampling(self, n_points):
         """Randomly samples points on the surface and function domain."""
@@ -462,9 +389,9 @@ class SpaceTimePointCloud(Dataset):
             size=on_surface_count,
             replace=False
         )
-        on_surface_samples = self.surface_samples[on_surface_idx, :]
+        on_surface_samples = self.surface_samples[on_surface_idx, ...]
 
-        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 3))
+        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 4))
         off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
             off_surface_points,
             use_depth_buffer=False,
@@ -479,7 +406,7 @@ class SpaceTimePointCloud(Dataset):
         if self.off_surface_sdf is not None:
             off_surface_samples[:, -1] = self.off_surface_sdf
         if self.off_surface_normals is not None:
-            off_surface_samples[:, 3:6] = self.off_surface_normals
+            off_surface_samples[:, 4:7] = self.off_surface_normals
 
         samples = torch.cat((on_surface_samples, off_surface_samples), dim=0)
 
@@ -489,7 +416,7 @@ class SpaceTimePointCloud(Dataset):
         spacetime_coords = torch.from_numpy(off_spacetime_points)
         spacetime_normals = torch.full((off_spacetime_count, 3), -1, dtype=torch.float32)
         spacetime_sdf = torch.full((off_spacetime_count, 1), -1, dtype=torch.float32)
-        
+
         # Adding a null vector as column for the coords tensor, since this
         # last coordinate represents time.
         coords = torch.cat((
@@ -509,3 +436,8 @@ class SpaceTimePointCloud(Dataset):
             "normals": normals.float(),
             "sdf": sdf.float(),
         }
+
+
+if __name__ == "__main__":
+    meshes = [("data/armadillo.ply", 0), ("data/double_torus.ply", 1)]
+    spc = SpaceTimePointCloud(meshes, 50)
