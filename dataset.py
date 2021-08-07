@@ -389,9 +389,14 @@ class SpaceTimePointCloud(Dataset):
             size=on_surface_count,
             replace=False
         )
-        on_surface_samples = self.surface_samples[on_surface_idx, ...]
+        on_surface_idx_times = np.random.choice(
+            range(self.samples_on_surface.size(2)),
+            size=on_surface_count,
+            replace=True
+        )
+        on_surface_samples = self.surface_samples[on_surface_idx, :, on_surface_idx_times]
 
-        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 4))
+        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 3))
         off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
             off_surface_points,
             use_depth_buffer=False,
