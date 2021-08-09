@@ -1,5 +1,6 @@
 # coding: utf-8
 
+from itertools import repeat
 from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
 from mesh_to_sdf import (get_surface_point_cloud, scale_to_unit_cube,
                          scale_to_unit_sphere)
@@ -329,8 +330,10 @@ class SpaceTimePointCloud(Dataset):
         # sdf) and, T is the number of timesteps.
         self.surface_samples = torch.zeros(samples_on_surface, 8, len(mesh_paths))
 
-        self.point_clouds = dict()
-        for mesh_path in mesh_paths:
+        # SDF query structure for each initial condition.
+        self.point_clouds = [None] * len(mesh_paths)
+
+        for i, mesh_path in enumerate(mesh_paths):
             path, t = mesh_path
             if not silent:
                 print(f"Loading mesh \"{path}\" at time {t}.")
@@ -339,7 +342,7 @@ class SpaceTimePointCloud(Dataset):
             if not silent:
                 print(f"Creating point-cloud and acceleration structures for time {t}.")
 
-            self.point_clouds[t] = get_surface_point_cloud(
+            self.point_clouds[i] = get_surface_point_cloud(
                 mesh,
                 surface_point_method="scan",
                 bounding_radius=1,
@@ -382,30 +385,78 @@ class SpaceTimePointCloud(Dataset):
 
         on_surface_count = n_points // 3
         off_surface_count = on_surface_count
-        off_spacetime_count = n_points - (on_surface_count + off_surface_count)
+        intermediate_count = n_points - (on_surface_count + off_surface_count)
 
+        on_surface_samples = self._sample_on_surface_init_conditions(on_surface_count)
+        off_surface_samples = self._sample_off_surface_init_conditions(off_surface_count)
+        intermediate_samples = self._sample_intermediate_times(intermediate_count)
+
+        samples = torch.cat(
+            (on_surface_samples, off_surface_samples, intermediate_samples),
+            dim=0
+        )
+
+        return {
+            "coords": samples[:, :4].float(),
+            "normals": samples[:, 4:7].float(),
+            "sdf": samples[:, -1].unsqueeze(-1).float(),
+        }
+
+        return samples
+
+    def _sample_on_surface_init_conditions(self, n_points):
+        # Selecting the points on surface
         on_surface_idx = np.random.choice(
             range(self.samples_on_surface),
-            size=on_surface_count,
+            size=n_points,
             replace=False
         )
-        on_surface_idx_times = np.random.choice(
-            range(self.samples_on_surface.size(2)),
-            size=on_surface_count,
-            replace=True
-        )
-        on_surface_samples = self.surface_samples[on_surface_idx, :, on_surface_idx_times]
 
-        off_surface_points = np.random.uniform(-1, 1, size=(off_surface_count, 3))
-        off_surface_sdf, off_surface_normals = self.point_cloud.get_sdf(
+        # Dividing these points among the available meshes (times)
+        idx_per_time = n_points // self.surface_samples.size(2)
+        on_surface_idx_times = []
+        for i in range(self.surface_samples.size(2)):
+            on_surface_idx_times.extend(list(repeat(i, idx_per_time)))
+
+        return self.surface_samples[on_surface_idx, :, on_surface_idx_times]
+
+    def _sample_off_surface_init_conditions(self, n_points):
+        # Same principle here. We select the points off-surface and then
+        # distribute them along time.
+        off_surface_points = np.random.uniform(-1, 1, size=(n_points, 3))
+        idx_per_time = n_points // self.surface_samples.size(2)
+
+        off_surface_idx_times = []
+        for i in range(self.surface_samples.size(2)):
+            off_surface_idx_times.extend(list(repeat(i, idx_per_time)))
+        off_surface_idx_times = np.array(off_surface_idx_times)
+
+        # Concatenating the time as a new coordinate => (x, y, z, t).
+        off_surface_points = np.hstack((
             off_surface_points,
-            use_depth_buffer=False,
-            return_gradients=True
-        )
+            off_surface_idx_times[:, np.newaxis]
+        ))
+
+        # Estimating the SDF and normals for each initial condition.
+        off_surface_sdf, off_surface_normals = None, None
+        for i in range(self.surface_samples.size(2)):
+            points_idx = off_surface_points[:, -1] == i
+            sdf_i, normals_i = self.point_clouds[i].get_sdf(
+                off_surface_points[points_idx, :-1],
+                use_depth_buffer=False,
+                return_gradients=True
+            )
+            if off_surface_sdf is None:
+                off_surface_sdf = sdf_i[:, np.newaxis]
+                off_surface_normals = normals_i
+                continue
+            off_surface_sdf = np.vstack((off_surface_sdf, sdf_i[:, np.newaxis]))
+            off_surface_normals = np.vstack((off_surface_normals, normals_i))
+
         off_surface_samples = torch.from_numpy(np.hstack((
             off_surface_points,
             off_surface_normals,
-            off_surface_sdf[:, np.newaxis]
+            off_surface_sdf
         )).astype(np.float32))
 
         if self.off_surface_sdf is not None:
@@ -413,36 +464,20 @@ class SpaceTimePointCloud(Dataset):
         if self.off_surface_normals is not None:
             off_surface_samples[:, 4:7] = self.off_surface_normals
 
-        samples = torch.cat((on_surface_samples, off_surface_samples), dim=0)
+        return off_surface_samples
 
+    def _sample_intermediate_times(self, n_points):
         # Samples for intermediate times.
-        off_spacetime_points = np.random.uniform(-1, 1, size=(off_spacetime_count, 4))
+        off_spacetime_points = np.random.uniform(-1, 1, size=(n_points, 4))
         # warning: time goes from -1 to 1
-        spacetime_coords = torch.from_numpy(off_spacetime_points)
-        spacetime_normals = torch.full((off_spacetime_count, 3), -1, dtype=torch.float32)
-        spacetime_sdf = torch.full((off_spacetime_count, 1), -1, dtype=torch.float32)
-
-        # Adding a null vector as column for the coords tensor, since this
-        # last coordinate represents time.
-        coords = torch.cat((
-            samples[:, :3], torch.zeros((samples.size(0), 1))
-        ), dim=1) #(x,y,z,t=0)
-        normals = samples[:, 3:6]
-        # Unsqueezing the SDF since it returns a shape [1] tensor and we need a
-        # [1, 1] shaped tensor.
-        sdf = samples[:, -1].unsqueeze(-1)
-
-        coords = torch.cat((coords, spacetime_coords), dim=0)
-        normals = torch.cat((normals, spacetime_normals), dim=0)
-        sdf = torch.cat((sdf, spacetime_sdf), dim=0)
-
-        return {
-            "coords": coords.float(),
-            "normals": normals.float(),
-            "sdf": sdf.float(),
-        }
+        samples = torch.cat((
+            torch.from_numpy(off_spacetime_points.astype(np.float32)),
+            torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32),
+            torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32),
+        ), dim=1)
+        return samples
 
 
 if __name__ == "__main__":
-    meshes = [("data/armadillo.ply", 0), ("data/double_torus.ply", 1)]
-    spc = SpaceTimePointCloud(meshes, 50)
+    meshes = [("data/armadillo.ply", 0), ("data/double_torus_low.ply", 1)]
+    spc = SpaceTimePointCloud(meshes, 60)
