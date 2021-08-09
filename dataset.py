@@ -358,9 +358,9 @@ class SpaceTimePointCloud(Dataset):
                 samples_on_surface,
                 sample_vertices=True
             )
-            self.surface_samples[:, :3, t] = surface_samples[..., :3]
-            self.surface_samples[:, 3, t] = t
-            self.surface_samples[:, 4:, t] = surface_samples[..., 3:]
+            self.surface_samples[:, :3, i] = surface_samples[..., :3]
+            self.surface_samples[:, 3, i] = t
+            self.surface_samples[:, 4:, i] = surface_samples[..., 3:]
 
             if not silent:
                 print(f"Done for time {t}.")
@@ -426,21 +426,22 @@ class SpaceTimePointCloud(Dataset):
         off_surface_points = np.random.uniform(-1, 1, size=(n_points, 3))
         idx_per_time = n_points // self.surface_samples.size(2)
 
-        off_surface_idx_times = []
+        idx_times = []
         for i in range(self.surface_samples.size(2)):
-            off_surface_idx_times.extend(list(repeat(i, idx_per_time)))
-        off_surface_idx_times = np.array(off_surface_idx_times)
+            idx_times.extend(list(repeat(i, idx_per_time)))
+        idx_times = np.array(idx_times)
+        times = self.surface_samples[0, 3, idx_times]
 
         # Concatenating the time as a new coordinate => (x, y, z, t).
-        off_surface_points = np.hstack((
-            off_surface_points,
-            off_surface_idx_times[:, np.newaxis]
-        ))
+        off_surface_points = torch.cat((
+            torch.from_numpy(off_surface_points),
+            times.unsqueeze(-1)
+        ), dim=1)
 
         # Estimating the SDF and normals for each initial condition.
         off_surface_sdf, off_surface_normals = None, None
         for i in range(self.surface_samples.size(2)):
-            points_idx = off_surface_points[:, -1] == i
+            points_idx = off_surface_points[:, -1] == torch.unique(times[i])
             sdf_i, normals_i = self.point_clouds[i].get_sdf(
                 off_surface_points[points_idx, :-1],
                 use_depth_buffer=False,
@@ -479,5 +480,5 @@ class SpaceTimePointCloud(Dataset):
 
 
 if __name__ == "__main__":
-    meshes = [("data/armadillo.ply", 0), ("data/double_torus_low.ply", 1)]
+    meshes = [("data/armadillo.ply", 0), ("data/double_torus_low.ply", 0.1)]
     spc = SpaceTimePointCloud(meshes, 60)
