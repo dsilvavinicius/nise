@@ -324,11 +324,11 @@ class SpaceTimePointCloud(Dataset):
                 off_surface_normals.astype(np.float32)
             )
 
-        # This is a mode-3 tensor that will hold our surface samples for all
-        # given meshes. This tensor's shape is [N, 8, T], where N is the number
+        # This is a mode-2 tensor that will hold our surface samples for all
+        # given meshes. This tensor's shape is [NxT, 8], where N is the number
         # of points of each mesh, 8 for the features (x, y, z, t, nx, ny, nz,
         # sdf) and, T is the number of timesteps.
-        self.surface_samples = torch.zeros(samples_on_surface, 8, len(mesh_paths))
+        self.surface_samples = torch.zeros(samples_on_surface * len(mesh_paths), 8)
 
         # SDF query structure for each initial condition.
         self.point_clouds = [None] * len(mesh_paths)
@@ -358,9 +358,10 @@ class SpaceTimePointCloud(Dataset):
                 samples_on_surface,
                 sample_vertices=True
             )
-            self.surface_samples[:, :3, i] = surface_samples[..., :3]
-            self.surface_samples[:, 3, i] = t
-            self.surface_samples[:, 4:, i] = surface_samples[..., 3:]
+            rows = range(i * samples_on_surface, (i+1) * samples_on_surface)
+            self.surface_samples[rows, :3] = surface_samples[..., :3]
+            self.surface_samples[rows, 3] = t
+            self.surface_samples[rows, 4:] = surface_samples[..., 3:]
 
             if not silent:
                 print(f"Done for time {t}.")
@@ -405,43 +406,39 @@ class SpaceTimePointCloud(Dataset):
         return samples
 
     def _sample_on_surface_init_conditions(self, n_points):
-        # Selecting the points on surface
-        on_surface_idx = np.random.choice(
-            range(self.samples_on_surface),
+        # Selecting the points on surface. Each mesh has `samples_on_surface`
+        # points sampled from it, thus, we must select
+        # `num_meshes * samples_on_surface` points here.
+        idx = np.random.choice(
+            range(len(self.point_clouds) * self.samples_on_surface),
             size=n_points,
             replace=False
         )
 
-        # Dividing these points among the available meshes (times)
-        idx_per_time = n_points // self.surface_samples.size(2)
-        on_surface_idx_times = []
-        for i in range(self.surface_samples.size(2)):
-            on_surface_idx_times.extend(list(repeat(i, idx_per_time)))
-
-        return self.surface_samples[on_surface_idx, :, on_surface_idx_times]
+        return self.surface_samples[idx, :]
 
     def _sample_off_surface_init_conditions(self, n_points):
         # Same principle here. We select the points off-surface and then
         # distribute them along time.
         off_surface_points = np.random.uniform(-1, 1, size=(n_points, 3))
-        idx_per_time = n_points // self.surface_samples.size(2)
-
-        idx_times = []
-        for i in range(self.surface_samples.size(2)):
-            idx_times.extend(list(repeat(i, idx_per_time)))
-        idx_times = np.array(idx_times)
-        times = self.surface_samples[0, 3, idx_times]
+        unique_times = torch.unique(self.surface_samples[:, 3])
+        times = np.random.choice(
+            unique_times,
+            size=n_points,
+            replace=True
+        )
 
         # Concatenating the time as a new coordinate => (x, y, z, t).
         off_surface_points = torch.cat((
             torch.from_numpy(off_surface_points),
-            times.unsqueeze(-1)
+            torch.from_numpy(times).unsqueeze(-1)
         ), dim=1)
 
         # Estimating the SDF and normals for each initial condition.
+        num_times = len(unique_times)
         off_surface_sdf, off_surface_normals = None, None
-        for i in range(self.surface_samples.size(2)):
-            points_idx = off_surface_points[:, -1] == torch.unique(times[i])
+        for i in range(num_times):
+            points_idx = off_surface_points[:, -1] == unique_times[i]
             sdf_i, normals_i = self.point_clouds[i].get_sdf(
                 off_surface_points[points_idx, :-1],
                 use_depth_buffer=False,
@@ -480,5 +477,9 @@ class SpaceTimePointCloud(Dataset):
 
 
 if __name__ == "__main__":
-    meshes = [("data/armadillo.ply", 0), ("data/double_torus_low.ply", 0.1)]
-    spc = SpaceTimePointCloud(meshes, 60)
+    meshes = [
+        ("data/armadillo.ply", 0),
+        ("data/double_torus_low.ply", 0.1),
+        ("data/cube.ply", 0.6)
+    ]
+    spc = SpaceTimePointCloud(meshes, 30)
