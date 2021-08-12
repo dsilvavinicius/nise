@@ -345,7 +345,7 @@ class SpaceTimePointCloud(Dataset):
             self.point_clouds[i] = get_surface_point_cloud(
                 mesh,
                 surface_point_method="scan",
-                bounding_radius=1,
+                #bounding_radius=1,
                 calculate_normals=True
             )
 
@@ -403,14 +403,12 @@ class SpaceTimePointCloud(Dataset):
             "sdf": samples[:, -1].unsqueeze(-1).float(),
         }
 
-        return samples
-
     def _sample_on_surface_init_conditions(self, n_points):
         # Selecting the points on surface. Each mesh has `samples_on_surface`
         # points sampled from it, thus, we must select
         # `num_meshes * samples_on_surface` points here.
         idx = np.random.choice(
-            range(len(self.point_clouds) * self.samples_on_surface),
+            range(self.surface_samples.shape[0]),
             size=n_points,
             replace=False
         )
@@ -436,7 +434,7 @@ class SpaceTimePointCloud(Dataset):
 
         # Estimating the SDF and normals for each initial condition.
         num_times = len(unique_times)
-        off_surface_sdf, off_surface_normals = None, None
+        off_surface_coords, off_surface_sdf, off_surface_normals = None, None, None
         for i in range(num_times):
             points_idx = off_surface_points[:, -1] == unique_times[i]
             sdf_i, normals_i = self.point_clouds[i].get_sdf(
@@ -444,15 +442,19 @@ class SpaceTimePointCloud(Dataset):
                 use_depth_buffer=False,
                 return_gradients=True
             )
+            
             if off_surface_sdf is None:
+                off_surface_coords = off_surface_points[points_idx, :]
                 off_surface_sdf = sdf_i[:, np.newaxis]
                 off_surface_normals = normals_i
                 continue
+
+            off_surface_coords = np.vstack((off_surface_coords, off_surface_points[points_idx, :]))
             off_surface_sdf = np.vstack((off_surface_sdf, sdf_i[:, np.newaxis]))
             off_surface_normals = np.vstack((off_surface_normals, normals_i))
 
         off_surface_samples = torch.from_numpy(np.hstack((
-            off_surface_points,
+            off_surface_coords,
             off_surface_normals,
             off_surface_sdf
         )).astype(np.float32))
