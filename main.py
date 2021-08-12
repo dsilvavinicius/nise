@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time
+from loss import sdf_morphing, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -98,16 +98,21 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     running_loss[it] += l.item()
 
             # Adding an iteration of the training data to tensorboard
-            if space_time:
-                colors = torch.zeros_like(data["coords"][:,:,0:3], device="cpu", requires_grad=False)
+            if space_time: 
+                coords_time0 = data["coords"][data["coords"][...,3]==0]
+                colors = torch.zeros_like(coords_time0[...,0:3], device="cpu", requires_grad=False)
+                sdf_time0 = data["sdf"][data["coords"][...,3]==0]
+                inputs = coords_time0[...,0:3].to(device)
             else:
                 colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
             
-            colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-            colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-            colors[data["sdf"].squeeze(-1) > 0, :] = torch.Tensor([0, 0, 255])
+            #at time zero
+            colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+            colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+            colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+            
             writer.add_mesh(
-                "input", inputs, colors=colors, global_step=epoch
+                "input", inputs.unsqueeze(0), colors=colors.unsqueeze(0), global_step=epoch
             )
             writer.add_scalar("train_loss", train_loss.item(), epoch)
 
@@ -147,11 +152,11 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 4    # number of samples of the interval time [0,1]
+                N = 8    # number of samples of the interval time [0,1]
                 for i in range(N):
-                    #T = 0.08*(i)/(N-1)
-                    pi = 3.14159265359/4
-                    T = pi*(i)/(N-1)
+                    T = 0.5*i/(N-1)
+                    #pi = 3.14159265359/4
+                    #T = pi*(i)/(N-1)
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -236,14 +241,15 @@ if __name__ == "__main__":
 
     dataset = None
     if space_time:
+        datasets = parameter_dict["dataset"]
+        for d in datasets:
+            d[0] = os.path.join("data", d[0])
         dataset = SpaceTimePointCloud(
-            os.path.join("data", parameter_dict["dataset"]),
+            datasets,
             sampling_config["samples_on_surface"],
             scaling=scaling,
             off_surface_sdf=off_surface_sdf,
             off_surface_normals=off_surface_normals,
-            random_surf_samples=sampling_config["random_surf_samples"],
-            no_sampler=no_sampler,
             batch_size=parameter_dict["batch_size"],
             silent=False
         )
@@ -297,6 +303,10 @@ if __name__ == "__main__":
                 loss_fn = sdf_time
             else:    
                 loss_fn = true_sdf_off_surface
+        elif loss == "sdf_boundary_problem":
+            loss_fn = sdf_boundary_problem
+        elif loss == "sdf_morphing":
+            loss_fn = sdf_morphing
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 
