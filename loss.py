@@ -432,7 +432,6 @@ def sdf_morphing(X, gt):
 
     grad = gradient(pred_sdf, coords)
 
-
     # PDE constraints
     mean_curvature_constraint = mean_curvature_equation(grad, coords)
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)

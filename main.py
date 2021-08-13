@@ -154,7 +154,7 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             if space_time:
                 N = 8    # number of samples of the interval time [0,1]
                 for i in range(N):
-                    T = 0.5*i/(N-1)
+                    T = 0.5 - 0.5*(i**3)/((N-1)**3)
                     #pi = 3.14159265359/4
                     #T = pi*(i)/(N-1)
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
