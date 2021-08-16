@@ -384,7 +384,8 @@ class SpaceTimePointCloud(Dataset):
         if n_points <= 0:
             n_points = self.samples_on_surface
 
-        on_surface_count = n_points // 3
+        # on_surface_count = n_points // 3
+        on_surface_count = n_points // 4
         off_surface_count = on_surface_count
         intermediate_count = n_points - (on_surface_count + off_surface_count)
 

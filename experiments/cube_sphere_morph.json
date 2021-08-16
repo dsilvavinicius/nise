@@ -16,7 +16,7 @@
     "experiment_name": "cube_sphere_mean_curvature_morph",
     "epochs_to_checkpoint": 10,
     "epochs_to_reconstruction": 10,
-    "loss": "sdf_morphing",
+    "loss": "loss_mean_curv",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4

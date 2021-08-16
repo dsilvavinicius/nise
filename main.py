@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_morphing, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem
+from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -152,9 +152,10 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 8    # number of samples of the interval time [0,1]
+                N = 10    # number of samples of the interval time [0,1]
                 for i in range(N):
-                    T = 0.5 - 0.5*(i**3)/((N-1)**3)
+                    #T = 0.5 - 0.5*(i**3)/((N-1)**3)
+                    T = 0.5*(i)/(N-1)
                     #pi = 3.14159265359/4
                     #T = pi*(i)/(N-1)
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
@@ -305,8 +306,12 @@ if __name__ == "__main__":
                 loss_fn = true_sdf_off_surface
         elif loss == "sdf_boundary_problem":
             loss_fn = sdf_boundary_problem
-        elif loss == "sdf_morphing":
-            loss_fn = sdf_morphing
+        elif loss == "loss_mean_curv":
+            loss_fn = loss_mean_curv
+        elif loss == "loss_eikonal":
+            loss_fn = loss_eikonal
+        elif loss == "loss_eikonal_mean_curv":
+            loss_fn = loss_eikonal_mean_curv
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 
