@@ -335,23 +335,39 @@ figure {
 		</p>
 	</section>
 
-    <!-- @TiagoNovello
 	<section id="overview"/>
 		<h2>Overview</h2>
 		<hr>
 		<p>	
-			The main contribution of our work is a global geometric representation in the continuous setting using neural networks as implicit functions. Besides capturing geometric detail, this model is robust for shape analysis and it is efficient since we have its derivatives in closed form.<br>
+		
+			The zero-level set \(g^{-1}(0))\ of an \textit{implicit function} $g:\R^3\to \R$ can be used to represent a surface $S$ in $\R^3$.
+			We say that the implicit function $g$ is \textit{neural} iff it is modeled by a neural network.
+			We call the zero-level set $g^{-1}(0)$ a \textit{neural implicit surface}.  
 
-            Specifically, we propose a loss function that allows the exploration of tools from continuous differential geometry during the training of the neural implicit function. This results in high fidelity when reconstructing geometric features of the surface.<br>
 
-            During the training of the neural implicit function, we use the discrete differential geometry of the dataset (triangle mesh) to sample important regions. This results in robust and fast training, without losing geometric details.<br>
+			Let $S$ be a surface in $\R^3$, and $g:\R^3\to \R$ be an "unknown" neural implicit function. To compute the parameter set of $g$ such that $g^{-1}(0)$ approximates $S$, it is common to consider the following \textit{Eikonal} problem in the loss function.
+			\begin{align}\label{e-3d_eikonal_equation}
+			\begin{cases}
+			|\nabla g|=1 & \text{  in } \mathbb{R}^3,\\
+			g =0 & \text{  on } S,\\
+			\frac{\partial g}{\partial N}=1 & \text{  on } S
+			\end{cases}
+			\end{align}
+			The \textit{Eikonal equation} $|\nabla g|=1$ asks for $g$ to be a \textit{signed distance function}. The \textit{Dirichlet condition},  $g=0$ on $S$, requires that $g$ is the signed distance from a set in $\R^3$ that includes the surface $S$. The \textit{Neumann condition}, $\frac{\partial g}{\partial N}=1$ on $S$, forces $\nabla g$ to be aligned to the normal field $N$ of $S$. 
 
-            Defining the appropriate depth/width of the neural implicit function to represent a given surface remains an open problem. However, if the network has more capacity than necessary, we propose an optimization of its parameters using SVD. This reduces the number of parameters, allowing for efficient inference. When the network cannot represent a given surface, we just increase the dimension of its hidden domains.<br>
+			We augment the domain $\R^3$ by a product space $\R^3\times \R^k$, where $p\in \R^3$ denotes a point in the space and $c\in\R^k$ denotes a vector that control $k$ direction of possible animations (rigid motion, smoothing, morphing, ...) of the initial implicit surface. 
+			In this work we focus on the \textit{space-time} $\R^3\times \R$. 
 
-            To visualize neural implicit surfaces in real-time, we present an implementation of the (neural) sphere tracing in GPU. We also adopt the above network optimization for efficient memory usage during the sphere tracing.<br>
+			Specifically, let $f:\R^3\times\R\to \R$ be a smooth neural function representing an \textit{one-parameter} family of neural implicit functions $f_t:\R^3\to \R$ defined by $f_t(p)=f(p,t)$. Topologically, the family $f_t$ represents \textit{homotopies} between any two functions $f_{t_0},\,f_{t_1}:\R^3\to \R$, with ${t_0}, {t_1}\in\R$. Thus, we say that $f$ is a \textit{neural homotopy function}.
+			The underlying family of neural implicit surfaces $ S_t = f_t^{-1} (0)$ is a \textit{neural animation} of the initial surface $S_0=S$. Restricted to the interval $[t_0,t_1]$, the surfaces $S_t$ provides a \textit{neural morphing} between the neural implicit surfaces $S_{t_0}$ and $S_{t_1}$. 
+
+			In the same way that we considered a neural implicit function as a solution of the Eikonal problem, we could consider the neural homotopy $f:\R^3\times\R\to \R$ be a solution of a general \textit{partial differential equation} (PDE) problem $$\mathcal{F}\Big(\nabla^n f, \dots, \nabla^1 f, f, p, t\Big)=0$$ where $\nabla^k f$ denotes the derivative of order $k$ of $f$. \textit{Initial-boundary conditions} could also be used. In this work, we consider several definitions of $\mathcal{F}$ to model problems such as animation, smoothing, morphing, keyframe interpolation, etc. 
+
+			The time $t$ allows a continuous navigation in the neural animation $S_t=f_t^{-1}(0) $. Each instant $t$ also represents a \textit{transformation} $S_0 \to S_{t} $ of the initial implicit surface $S_0$.	
+			
+			
 		</p>
 	</section>
-    -->
 
 	<section id="results">
 		<h2>Results</h2>
