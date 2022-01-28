@@ -353,7 +353,7 @@ figure {
 			\frac{\partial g}{\partial N}=1 & \text{  on } S
 			\end{cases}
 			\end{align}
-			The \textit{Eikonal equation} $|\nabla g|=1$ asks for $g$ to be a \textit{signed distance function}. The \textit{Dirichlet condition},  $g=0$ on $S$, requires that $g$ is the signed distance from a set in $\R^3$ that includes the surface $S$. The \textit{Neumann condition}, $\frac{\partial g}{\partial N}=1$ on $S$, forces $\nabla g$ to be aligned to the normal field $N$ of $S$. 
+			The \textit{Eikonal equation} \(|\nabla g|=1)\ asks for $g$ to be a \textit{signed distance function}. The \textit{Dirichlet condition},  $g=0$ on $S$, requires that $g$ is the signed distance from a set in $\R^3$ that includes the surface $S$. The \textit{Neumann condition}, $\frac{\partial g}{\partial N}=1$ on $S$, forces $\nabla g$ to be aligned to the normal field $N$ of $S$. 
 
 			We augment the domain $\R^3$ by a product space $\R^3\times \R^k$, where $p\in \R^3$ denotes a point in the space and $c\in\R^k$ denotes a vector that control $k$ direction of possible animations (rigid motion, smoothing, morphing, ...) of the initial implicit surface. 
 			In this work we focus on the \textit{space-time} $\R^3\times \R$. 
@@ -363,7 +363,7 @@ figure {
 
 			In the same way that we considered a neural implicit function as a solution of the Eikonal problem, we could consider the neural homotopy $f:\R^3\times\R\to \R$ be a solution of a general \textit{partial differential equation} (PDE) problem $$\mathcal{F}\Big(\nabla^n f, \dots, \nabla^1 f, f, p, t\Big)=0$$ where $\nabla^k f$ denotes the derivative of order $k$ of $f$. \textit{Initial-boundary conditions} could also be used. In this work, we consider several definitions of $\mathcal{F}$ to model problems such as animation, smoothing, morphing, keyframe interpolation, etc. 
 
-			The time $t$ allows a continuous navigation in the neural animation $S_t=f_t^{-1}(0) $. Each instant $t$ also represents a \textit{transformation} $S_0 \to S_{t} $ of the initial implicit surface $S_0$.	
+			The time \(t)\ allows a continuous navigation in the neural animation $S_t=f_t^{-1}(0) $. Each instant \(t)\ also represents a \textit{transformation} $S_0 \to S_{t} $ of the initial implicit surface $S_0$.	
 			
 			
 		</p>
