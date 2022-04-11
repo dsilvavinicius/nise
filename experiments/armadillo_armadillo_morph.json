@@ -13,10 +13,10 @@
     "off_surface_normals": [-1, -1, -1],
     "batch_size": 15000,
     "checkpoint_path": "logs",
-    "experiment_name": "armadillo_armadillo_morph_curv",
+    "experiment_name": "armadillo_armadillo_morph_const",
     "epochs_to_checkpoint": 100,
     "epochs_to_reconstruction": 100,
-    "loss": "loss_mean_curv",
+    "loss": "loss_constant",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4

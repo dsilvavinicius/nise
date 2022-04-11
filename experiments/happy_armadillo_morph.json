@@ -13,9 +13,9 @@
     "off_surface_normals": [-1, -1, -1],
     "batch_size": 18000,
     "checkpoint_path": "logs",
-    "experiment_name": "happy_armadillo_morph",
+    "experiment_name": "happy_armadillo_morph_1x256",
     "epochs_to_checkpoint": 100,
-    "epochs_to_reconstruction": 100,
+    "epochs_to_reconstruction": 1000,
     "loss": "loss_eikonal",
     "optimizer": {
         "type": "adam",
@@ -26,7 +26,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [256,256,256],
+        "hidden_layer_nodes": [256,256],
         "w0": 30
     }
 }

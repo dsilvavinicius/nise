@@ -1,7 +1,7 @@
 {
-    "description": "Solving the Eikonal equation without restrictions along time. We consider the cube as an initial condition.",
+    "description": "SIREN Learning of the Armadillo mesh.",
     "space_time": true,
-    "num_epochs": 10000,
+    "num_epochs": 50000,
     "sampling_opts": {
         "samples_on_surface": 40000,
         "samples_off_surface": 40000,
@@ -9,13 +9,13 @@
         "sampler": false
     },
     "scaling": "",
-    "dataset": [["woman.ply", 0], ["armadillo.ply", 0.25]],
+    "dataset": [["cube.ply", 0]],
     "off_surface_normals": [-1, -1, -1],
-    "batch_size": 16000,
+    "batch_size": 20000,
     "checkpoint_path": "logs",
-    "experiment_name": "woman_armadillo_morph_curv",
-    "epochs_to_checkpoint": 100,
-    "epochs_to_reconstruction": 100,
+    "experiment_name": "cube_smooth_256",
+    "epochs_to_checkpoint": 1000,
+    "epochs_to_reconstruction": 1000,
     "loss": "loss_mean_curv",
     "optimizer": {
         "type": "adam",
@@ -26,7 +26,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [256,256,256],
-        "w0": 30
+        "hidden_layer_nodes": [256, 256, 256],
+        "w0": 16
     }
 }

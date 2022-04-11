@@ -16,7 +16,7 @@
     "experiment_name": "woman_armadillo_morph_curv",
     "epochs_to_checkpoint": 100,
     "epochs_to_reconstruction": 100,
-    "loss": "loss_mean_curv",
+    "loss": "loss_vector_field",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4
