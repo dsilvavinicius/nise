@@ -110,11 +110,15 @@ def mean_curvature_equation(grad, x, scale = 0.00000001):
 
 
 def morphing_to_cube(grad, x):
-    ft = grad[:,:,3]
-    grad = grad[:,:,0:3]
+    ft = grad[...,3]
+    grad = grad[...,0:3]
     grad_norm = torch.norm(grad, dim=-1)
     #cube
-    dist = torch.maximum( torch.maximum(torch.abs(x[...,0]), torch.abs(x[...,1])), torch.abs(x[...,2])) - 0.65
+    X = torch.abs(x[...,0])
+    Y = torch.abs(x[...,1])
+    Z = torch.abs(x[...,2])
+    #dist = torch.maximum( torch.maximum(X, Y), Z) - 0.57
+    dist = X**8 + Y**8 + Z**8 - 0.57**8
 
     return (ft - grad_norm*dist)**2
     #return torch.abs(ft - grad_norm*dist)
@@ -644,13 +648,33 @@ def loss_constant(X, gt):
         "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e2,
     }
 
-# class SDFTimeLoss(torch.nn.Module):
-#     def __init__(self, constraints_weights:dict, pde_constraint_func=None) -> None:
-#         self.constraints_weights = constraints_weights
-#         self.pde_constraint_f = pde_constraint_func
 
-#     def forward(self, X, gt):
-#         pass
 
-# myloss = SDFTimeLoss()
-# myloss.constraints_weights["normal_on_surface_constraint"] = 1e-5
+def loss_vector_field_morph(X, gt):
+    
+    gt_sdf = gt["sdf"]
+    gt_normals = gt["normals"]
+    
+    coords = X["model_in"]
+    pred_sdf = X["model_out"]
+
+    grad = gradient(pred_sdf, coords)
+
+    # PDE constraints
+    morphing_constraint = morphing_to_cube(grad, coords).unsqueeze(-1)
+    #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+    grad = grad[:,:,0:3] 
+    grad_constraint_spacetime = eikonal_constraint(grad).unsqueeze(-1)
+
+    # Initial-boundary constraints of the Eikonal equation at t=0
+    sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
+    
+    return {
+        "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
+        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e2,
+        "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
+        "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e1,
+        "morphing_constraint": morphing_constraint.mean() * 1e1,
+    }

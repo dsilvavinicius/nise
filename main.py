@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport
+from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -152,13 +152,9 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 21    # number of samples of the interval time
+                N = 7    # number of samples of the interval time
                 for i in range(N):
-                    #T = 0.5 - 0.5*(i**3)/((N-1)**3)
-                    T = -0.1 + 0.1*2*(i)/(N-1)
-                    #T = 0.25*((i)/(N-1))
-                    #pi = 3.14159265359/4
-                    #T = pi*(i)/(N-1)
+                    T = 0.2*(i/(N-1))
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -317,6 +313,8 @@ if __name__ == "__main__":
             loss_fn = loss_constant
         elif loss == "loss_transport":
             loss_fn = loss_transport
+        elif loss == "loss_vector_field_morph":
+            loss_fn = loss_vector_field_morph
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 
