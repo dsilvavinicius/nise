@@ -165,7 +165,7 @@ class PointCloud(Dataset):
         self.point_cloud = get_surface_point_cloud(
             mesh,
             surface_point_method="scan",
-            bounding_radius=1,
+            # bounding_radius=1,
             calculate_normals=True
         )
 

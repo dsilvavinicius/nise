@@ -98,22 +98,32 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     running_loss[it] += l.item()
 
             # Adding an iteration of the training data to tensorboard
-            if space_time: 
-                coords_time0 = data["coords"][data["coords"][...,3]==0]
-                colors = torch.zeros_like(coords_time0[...,0:3], device="cpu", requires_grad=False)
-                sdf_time0 = data["sdf"][data["coords"][...,3]==0]
-                inputs = coords_time0[...,0:3].to(device)
-            else:
+            # if space_time:
+                # coords_time0 = data["coords"][data["coords"][..., 3] == 0]
+                # colors = torch.zeros_like(coords_time0[..., 0:3], device="cpu", requires_grad=False)
+                # sdf_time0 = data["sdf"][data["coords"][..., 3] == 0]
+                # inputs = coords_time0[..., 0:3].to(device)
+
+                # #at time zero
+                # colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+                # colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+                # colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+
+                # writer.add_mesh(
+                #     "input", inputs.unsqueeze(-1), colors=colors.unsqueeze(-1), global_step=epoch
+                # )
+            if not space_time:
                 colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
             
-            #at time zero
-            colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-            colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-            colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
-            
-            writer.add_mesh(
-                "input", inputs.unsqueeze(0), colors=colors.unsqueeze(0), global_step=epoch
-            )
+                #at time zero
+                colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+                colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+                colors[data["sdf"].squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+
+                writer.add_mesh(
+                    "input", inputs, colors=colors, global_step=epoch
+                )
+
             writer.add_scalar("train_loss", train_loss.item(), epoch)
 
             train_loss.backward()
@@ -171,17 +181,17 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     device=device
                 )
 
-            if normals.strides[1] < 0:
-                normals = normals[:, ::-1]
-            verts = torch.from_numpy(verts).unsqueeze(0)
-            normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
+                if normals.strides[1] < 0:
+                    normals = normals[:, ::-1]
+                verts = torch.from_numpy(verts).unsqueeze(0)
+                normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
 
-            writer.add_mesh(
-                "reconstructed_point_cloud",
-                vertices=verts,
-                colors=normals,
-                global_step=epoch
-            )
+                writer.add_mesh(
+                    "reconstructed_point_cloud",
+                    vertices=verts,
+                    colors=normals,
+                    global_step=epoch
+                )
 
             model.train()
 

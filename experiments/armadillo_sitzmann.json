@@ -1,0 +1,32 @@
+{
+    "description": "SIREN Learning of the Armadillo mesh.",
+    "num_epochs": 1000,
+    "sampling_opts": {
+        "samples_on_surface": 150000,
+        "samples_off_surface": 150000,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "scaling": "bbox",
+    "dataset": "armadillo.ply",
+    "off_surface_sdf": -1,
+    "off_surface_normals": [-1, -1, -1],
+    "batch_size": 20000,
+    "checkpoint_path": "logs",
+    "experiment_name": "armadillo_sitzmann",
+    "epochs_to_checkpoint": 10,
+    "epochs_to_reconstruction": 10,
+    "loss": "sitzmann",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 128,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [256, 256, 256],
+        "w0": 60
+    }
+}
