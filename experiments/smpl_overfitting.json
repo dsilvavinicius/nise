@@ -1,0 +1,32 @@
+{
+    "description": "Solving the Eikonal equation without restrictions along time. We consider the cube as an initial condition.",
+    "space_time": true,
+    "num_epochs": 20001,
+    "sampling_opts": {
+        "samples_on_surface": 6890,
+        "samples_off_surface": 6890,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "scaling": "",
+    "dataset": [["smpl/smpl_1.ply", 0],["smpl/smpl_2.ply", 0.1],["smpl/smpl_3.ply", 0.2],["smpl/smpl_4.ply", 0.3],["smpl/smpl_5.ply", 0.4]],
+    "off_surface_normals": [-1, -1, -1],
+    "batch_size":27560,
+    "checkpoint_path": "logs",
+    "experiment_name": "smpl_rede-2x256_w0-30_constant_along_time",
+    "epochs_to_checkpoint": 1000,
+    "epochs_to_reconstruction": 1000,
+    "loss": "loss_constant",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 512,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [256,256,256],
+        "w0": 30
+    }
+}
