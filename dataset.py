@@ -165,7 +165,7 @@ class PointCloud(Dataset):
         self.point_cloud = get_surface_point_cloud(
             mesh,
             surface_point_method="scan",
-            # bounding_radius=1,
+            bounding_radius=1,
             calculate_normals=True
         )
 
@@ -317,6 +317,8 @@ class SpaceTimePointCloud(Dataset):
         self.no_sampler = True
         self.batch_size = batch_size
 
+        self.n_steps = 0
+
         if off_surface_normals is None:
             self.off_surface_normals = None
         else:
@@ -345,6 +347,11 @@ class SpaceTimePointCloud(Dataset):
             if not silent:
                 print(f"Loading mesh \"{path}\" at time {t}.")
             mesh = trimesh.load(path)
+            
+            #translating the model to be inside [-1,1]^3, specific for the smpl model
+            vertices = mesh.vertices
+            vertices[..., 1] += 0.2
+            mesh = trimesh.Trimesh(vertices=vertices, faces=mesh.faces)
 
             if not silent:
                 print(f"Creating point-cloud and acceleration structures for time {t}.")
@@ -378,7 +385,7 @@ class SpaceTimePointCloud(Dataset):
 
     def __len__(self):
         if self.no_sampler:
-            return 3 * self.samples_on_surface // self.batch_size
+            return 4 * self.samples_on_surface // self.batch_size
         return self.samples_on_surface
 
     def __getitem__(self, idx):
@@ -391,10 +398,20 @@ class SpaceTimePointCloud(Dataset):
         if n_points <= 0:
             n_points = self.samples_on_surface
 
+        self.n_steps += 1
         # on_surface_count = n_points // 3
         on_surface_count = n_points // 4
-        off_surface_count = on_surface_count
+        off_surface_count = on_surface_count * 2
         intermediate_count = n_points - (on_surface_count + off_surface_count)
+
+        # if self.n_steps < 2010:
+        #     on_surface_count = n_points // 2
+        #     off_surface_count = on_surface_count
+        #     intermediate_count = n_points - (on_surface_count + off_surface_count)
+        # else:
+        #     on_surface_count = n_points // 4
+        #     off_surface_count = on_surface_count * 2
+        #     intermediate_count = n_points - (on_surface_count + off_surface_count)
 
         on_surface_samples = self._sample_on_surface_init_conditions(on_surface_count)
         off_surface_samples = self._sample_off_surface_init_conditions(off_surface_count)
@@ -477,7 +494,11 @@ class SpaceTimePointCloud(Dataset):
     def _sample_intermediate_times(self, n_points):
         # Samples for intermediate times.
         #off_spacetime_points = np.random.uniform(-1, 1, size=(n_points, 4))
-        off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4))
+
+        #warning: it does not work when considering only one initial condition since min_time=max_time
+        #off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4)) 
+        off_spacetime_points = np.random.uniform(-0.2, 0.2, size=(n_points, 4)) 
+        
         # warning: time goes from -1 to 1
         samples = torch.cat((
             torch.from_numpy(off_spacetime_points.astype(np.float32)),

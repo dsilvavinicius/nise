@@ -1,6 +1,7 @@
 '''From the DeepSDF repository https://github.com/facebookresearch/DeepSDF
 '''
 
+from ast import IsNot
 import logging
 import numpy as np
 import plyfile
@@ -10,7 +11,8 @@ import torch
 
 
 def create_mesh(
-    decoder,
+    shapeNet,
+    flowNet = None,
     filename="",
     t=-1000, #time=-1000 means we are only in the space
     N=256,
@@ -20,7 +22,9 @@ def create_mesh(
     device="cpu",
     silent=False
 ):
-    decoder.eval()
+    shapeNet.eval()
+    if flowNet is not None:
+        flowNet.eval()
 
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
     voxel_origin = [-1, -1, -1]
@@ -61,9 +65,14 @@ def create_mesh(
     while head < num_samples:
         #print(head)
         sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
-
+        
+        if flowNet is None:
+            sdfs = shapeNet(sample_subset)["model_out"]
+        else:
+            sdfs = eval_composedNet(shapeNet, flowNet, sample_subset)
+        
         samples[head:min(head + max_batch, num_samples), sdf_coord] = (
-            decoder(sample_subset)["model_out"]
+            sdfs
             .squeeze()
             .detach()
             .cpu()
@@ -96,6 +105,11 @@ def create_mesh(
 
     return verts, faces, normals, values
 
+
+def eval_composedNet(shapeNet, flowNet, coords_4d):
+    coords_3d = flowNet(coords_4d)['model_out']
+    sdfs = shapeNet(coords_3d)['model_out']
+    return sdfs
 
 def convert_sdf_samples_to_ply(
     pytorch_3d_sdf_tensor,

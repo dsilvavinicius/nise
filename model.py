@@ -75,7 +75,7 @@ class SIREN(nn.Module):
         self.net[0].apply(first_layer_sine_init)
         self.net[1:].apply(lambda module: sine_init(module, w0))
 
-    def forward(self, x):
+    def forward(self, x, preserve_grad=False):
         """Forward pass of the model.
 
         Parameters
@@ -90,7 +90,11 @@ class SIREN(nn.Module):
             and the model output under 'model_out'.
         """
         # Enables us to compute gradients w.r.t. coordinates
-        coords_org = x.clone().detach().requires_grad_(True)
+        if preserve_grad is False:
+            coords_org = x.clone().detach().requires_grad_(True)
+        else:
+            coords_org = x
+
         coords = coords_org
         y = self.net(coords)
         return {"model_in": coords_org, "model_out": y}

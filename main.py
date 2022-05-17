@@ -12,12 +12,12 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
+from loss import loss_flow, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
 
-def train_model(dataset, model, device, train_config, space_time=False, silent=False):
+def train_model(dataset, model, device, train_config, shapeNet=None, space_time=False, silent=False):
     BATCH_SIZE = train_config["batch_size"]
     EPOCHS = train_config["epochs"]
     EPOCHS_TIL_CHECKPOINT = 0
@@ -112,17 +112,17 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                 # writer.add_mesh(
                 #     "input", inputs.unsqueeze(-1), colors=colors.unsqueeze(-1), global_step=epoch
                 # )
-            if not space_time:
-                colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
+            # if not space_time:
+            #     colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
             
-                #at time zero
-                colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-                colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-                colors[data["sdf"].squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+            #     #at time zero
+            #     colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+            #     colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+            #     colors[data["sdf"].squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
 
-                writer.add_mesh(
-                    "input", inputs, colors=colors, global_step=epoch
-                )
+            #     writer.add_mesh(
+            #         "input", inputs, colors=colors, global_step=epoch
+            #     )
 
             writer.add_scalar("train_loss", train_loss.item(), epoch)
 
@@ -161,37 +161,41 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
             
-            if space_time:
-                N = 7    # number of samples of the interval time
-                for i in range(N):
-                    T = 0.2*(i/(N-1))
-                    mesh_file = f"epoch_{epoch}_time_{T}.ply"
-                    verts, _, normals, _ = create_mesh(
-                        model,
-                        filename=os.path.join(full_path, "reconstructions", mesh_file), 
-                        t=T,  # time instant for 4d SIREN function
-                        N=mesh_resolution,
-                        device=device
-                    )
-            else:
+            # if space_time:
+            N = 5    # number of samples of the interval time
+            T = -0.2
+            for i in range(N):
+                #T = 0.1*(i/(N-1))
+                #T = 0.4*(i/(N-1))
+                mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, _, normals, _ = create_mesh(
-                    model,
-                    filename=os.path.join(full_path, "reconstructions", mesh_file),
+                    shapeNet,
+                    flowNet=model,
+                    filename=os.path.join(full_path, "reconstructions", mesh_file), 
+                    t=T,  # time instant for 4d SIREN function
                     N=mesh_resolution,
                     device=device
                 )
+                T += 0.1
+            # else:
+            #     verts, _, normals, _ = create_mesh(
+            #         model,
+            #         filename=os.path.join(full_path, "reconstructions", mesh_file),
+            #         N=mesh_resolution,
+            #         device=device
+            #     )
 
-                if normals.strides[1] < 0:
-                    normals = normals[:, ::-1]
-                verts = torch.from_numpy(verts).unsqueeze(0)
-                normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
+            #     if normals.strides[1] < 0:
+            #         normals = normals[:, ::-1]
+            #     verts = torch.from_numpy(verts).unsqueeze(0)
+            #     normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
 
-                writer.add_mesh(
-                    "reconstructed_point_cloud",
-                    vertices=verts,
-                    colors=normals,
-                    global_step=epoch
-                )
+            #     writer.add_mesh(
+            #         "reconstructed_point_cloud",
+            #         vertices=verts,
+            #         colors=normals,
+            #         global_step=epoch
+            #     )
 
             model.train()
 
@@ -203,9 +207,6 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage="python main.py path_to_experiments")
     
-    #experiment_path = "experiments/double_torus_toy.json"
-    #experiment_path = "experiments/armadillo.json"
-    #experiment_path = "experiments/cube_time_0.json"
     p.add_argument(
         "experiment_path",
         help="Path to the JSON experiment description file"
@@ -227,10 +228,8 @@ if __name__ == "__main__":
         overwrite=False
     )
 
-    space_time = parameter_dict.get("space_time")  # consider the spacetime (x,y,z,t) as domain
-    n_in_features = 3  # implicit 3D models
-    if space_time:
-        n_in_features = 4  # used to animate implicit 3D models
+    # consider the spacetime (x,y,z,t) as domain
+    n_in_features = 4
 
     # Saving the parameters to the output path
     with open(os.path.join(full_path, "params.json"), "w+") as fout:
@@ -247,32 +246,18 @@ if __name__ == "__main__":
 
     scaling = parameter_dict.get("scaling")
 
-    dataset = None
-    if space_time:
-        datasets = parameter_dict["dataset"]
-        for d in datasets:
-            d[0] = os.path.join("data", d[0])
-        dataset = SpaceTimePointCloud(
-            datasets,
-            sampling_config["samples_on_surface"],
-            scaling=scaling,
-            off_surface_sdf=off_surface_sdf,
-            off_surface_normals=off_surface_normals,
-            batch_size=parameter_dict["batch_size"],
-            silent=False
-        )
-    else:
-        dataset = PointCloud(
-            os.path.join("data", parameter_dict["dataset"]),
-            sampling_config["samples_on_surface"],
-            scaling=scaling,
-            off_surface_sdf=off_surface_sdf,
-            off_surface_normals=off_surface_normals,
-            random_surf_samples=sampling_config["random_surf_samples"],
-            no_sampler=no_sampler,
-            batch_size=parameter_dict["batch_size"],
-            silent=False
-        )
+    datasets = parameter_dict["dataset"]
+    for d in datasets:
+        d[0] = os.path.join("data", d[0])
+    dataset = SpaceTimePointCloud(
+        datasets,
+        sampling_config["samples_on_surface"],
+        scaling=scaling,
+        off_surface_sdf=off_surface_sdf,
+        off_surface_normals=off_surface_normals,
+        batch_size=parameter_dict["batch_size"],
+        silent=False
+    )
 
     sampler = None
     sampler_opt = sampling_config.get("sampler")
@@ -282,51 +267,62 @@ if __name__ == "__main__":
             sampling_config["samples_off_surface"]
         )
 
+    
+    #shapeNet = SIREN #3D -> 1D
+    # launch the trained model
+    shapeNet = SIREN(
+                n_in_features=3,
+                n_out_features=1,
+                hidden_layer_config=[128,128,128],
+                w0=30
+            )
+    shapeNet.load_state_dict(torch.load('./shapeNets/smpl_red-2x128_w0-30_teste.pth'), strict=False)
+    shapeNet.cuda()
+    print(shapeNet)
+    
     hidden_layers = parameter_dict["network"]["hidden_layer_nodes"]
-    model = SIREN(
+    
+    #flowNet = SIREN  #4D -> 3D
+    #composedNet = shapeNet . flowNet # 4D -> 1D
+    flowNet = SIREN(
         n_in_features,
-        n_out_features=1,
+        n_out_features=3,
         hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
         w0=parameter_dict["network"]["w0"]
     )
-    if not args.silent:
-        print(model)
+    print(flowNet)
 
     opt_params = parameter_dict["optimizer"]
     if opt_params["type"] == "adam":
         optimizer = torch.optim.Adam(
             lr=opt_params["lr"],
-            params=model.parameters()
+            params=flowNet.parameters()
         )
 
-    loss = parameter_dict.get("loss")
-    if loss is not None and loss:
-        if loss == "sitzmann":
-            if space_time:
-                loss_fn = sdf_sitzmann_time   
-            else:    
-                loss_fn = sdf_sitzmann
-        elif loss == "true_sdf":  
-            if space_time:
-                loss_fn = sdf_time
-            else:    
-                loss_fn = true_sdf_off_surface
-        elif loss == "sdf_boundary_problem":
-            loss_fn = sdf_boundary_problem
-        elif loss == "loss_mean_curv":
-            loss_fn = loss_mean_curv
-        elif loss == "loss_eikonal":
-            loss_fn = loss_eikonal
-        elif loss == "loss_eikonal_mean_curv":
-            loss_fn = loss_eikonal_mean_curv
-        elif loss == "loss_constant":
-            loss_fn = loss_constant
-        elif loss == "loss_transport":
-            loss_fn = loss_transport
-        elif loss == "loss_vector_field_morph":
-            loss_fn = loss_vector_field_morph
-        else:
-            warnings.warn(f"Invalid loss function option {loss}. Using default.")
+    # loss = parameter_dict.get("loss")
+    # if loss is not None and loss:
+    #     if loss == "sitzmann":
+    #         loss_fn = sdf_sitzmann_time   
+    #     elif loss == "true_sdf":  
+    #         loss_fn = sdf_time
+    #     elif loss == "sdf_boundary_problem":
+    #         loss_fn = sdf_boundary_problem
+    #     elif loss == "loss_mean_curv":
+    #         loss_fn = loss_mean_curv
+    #     elif loss == "loss_eikonal":
+    #         loss_fn = loss_eikonal
+    #     elif loss == "loss_eikonal_mean_curv":
+    #         loss_fn = loss_eikonal_mean_curv
+    #     elif loss == "loss_constant":
+    #         loss_fn = loss_constant
+    #     elif loss == "loss_transport":
+    #         loss_fn = loss_transport
+    #     elif loss == "loss_vector_field_morph":
+    #         loss_fn = loss_vector_field_morph
+    #     else:
+    #         warnings.warn(f"Invalid loss function option {loss}. Using default.")
+    
+    loss_fn = loss_flow(shapeNet)
 
     config_dict = {
         "epochs": parameter_dict["num_epochs"],
@@ -342,10 +338,11 @@ if __name__ == "__main__":
 
     losses = train_model(
         dataset,
-        model,
+        flowNet,
         device,
         config_dict,
-        space_time,
+        shapeNet=shapeNet,
+        #space_time,
         silent=args.silent
     )
     loss_df = pd.DataFrame.from_dict(losses)
@@ -353,7 +350,7 @@ if __name__ == "__main__":
 
     # saving the final model
     torch.save(
-        model.state_dict(),
+        flowNet.state_dict(),
         os.path.join(full_path, "models", "model_final.pth")
     )
 
@@ -361,18 +358,12 @@ if __name__ == "__main__":
     mesh_file = parameter_dict["reconstruction"]["output_file"] + ".ply"
     mesh_resolution = parameter_dict["reconstruction"]["resolution"]
     
-    if space_time:
-        create_mesh(
-            model,
-            os.path.join(full_path, "reconstructions", mesh_file),
-            0,  # time instant for 4d SIREN function
-            N=mesh_resolution,
-            device=device
-        )
-    else: 
-        create_mesh(
-            model,
-            os.path.join(full_path, "reconstructions", mesh_file),
-            N=mesh_resolution,
-            device=device
-        )
+    # create_mesh(
+    #     shapeNet,
+    #     flowNet=flowNet,
+    #     filename=os.path.join(full_path, "reconstructions", mesh_file),
+    #     t=0,  # time instant for 4d SIREN function
+    #     N=mesh_resolution,
+    #     device=device
+    # )
+

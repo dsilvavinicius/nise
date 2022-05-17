@@ -1,9 +1,10 @@
 # coding: utf-8
 
 from math import pi
+from numpy import identity
 import torch
 from torch.functional import F
-from util import gradient
+from util import gradient, jacobian
 from util import divergence
 
 def on_surface_sdf_constraint(gt_sdf, pred_sdf):
@@ -63,6 +64,19 @@ def on_surface_normal_constraint(gt_sdf, gt_normals, grad):
     return torch.where(
            gt_sdf == 0,
            1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+           torch.zeros_like(grad[..., :1])
+    )
+
+
+def on_surface_normal_direction_aligment(gt_sdf, gt_normals, grad):
+    """
+    This function return a number that measure how far gt_normals
+    and grad are aligned in the zero-level set of sdf.
+    """
+    return torch.where(
+           gt_sdf == 0,
+           1 - (F.cosine_similarity(grad, gt_normals, dim=-1)[..., None])**2,
+           #1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
            torch.zeros_like(grad[..., :1])
     )
 
@@ -598,29 +612,6 @@ def loss_eikonal_mean_curv(X, gt):
 
 
 def loss_constant(X, gt):
-    """Loss function employed in Sitzmann et al. for SDF experiments [1].
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-
-    References
-    ----------
-    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
-    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
-    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
-    """
     gt_sdf = gt["sdf"]
     gt_normals = gt["normals"]
     
@@ -630,7 +621,8 @@ def loss_constant(X, gt):
     grad = gradient(pred_sdf, coords)
 
     # PDE constraints
-    const_constraint = torch.abs(grad[:,:,3])
+    const_constraint = torch.where(gt_sdf == -1, grad[:,:,3].unsqueeze(-1)**2, torch.zeros_like(gt_sdf))
+
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
     grad = grad[:,:,0:3] 
     grad_constraint_spacetime = eikonal_constraint(grad).unsqueeze(-1)
@@ -638,14 +630,15 @@ def loss_constant(X, gt):
     # Initial-boundary constraints of the Eikonal equation at t=0
     sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
     normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    #normal_on_surface_constraint = on_surface_normal_direction_aligment(gt_sdf, gt_normals, grad) 
     sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
     
     return {
         "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
-        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 1e2,
+        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e2,
         "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
-        "const_constraint": const_constraint.mean() * 1e2,
-        "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e2,
+        "const_constraint": const_constraint.mean()*1e1,
+        "grad_constraint_spacetime": grad_constraint_spacetime.mean()*1e1,
     }
 
 
@@ -678,3 +671,131 @@ def loss_vector_field_morph(X, gt):
         "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e1,
         "morphing_constraint": morphing_constraint.mean() * 1e1,
     }
+
+
+# flow versions
+
+class loss_flow(torch.nn.Module):
+    def __init__(self, shapeNet):
+        super().__init__()
+        # Define the model.
+        self.shapeNet = shapeNet
+        self.shapeNet.cuda()
+
+    def forward(self, flowNet, gt):
+        #return self.transport(flowNet, gt)
+        return self.implicit_transport(flowNet, gt)
+    
+    def transport(self, flowNet, gt):
+        gt_sdf = gt["sdf"]
+        gt_normals = gt["normals"]
+        
+        coords_4d = flowNet["model_in"]
+        coords_3d = flowNet["model_out"]
+ 
+        jacobian_flow = jacobian(coords_3d, coords_4d)[0]
+
+        # grad_composed = grad_shape * jacobian_flow
+        jacobian_flow = jacobian_flow.squeeze(0)
+        
+        v = torch.ones_like(gt_normals)
+        tv = v*coords_4d[...,3].unsqueeze(-1)
+        translations = coords_3d - (coords_4d[...,0:3] + tv)
+        transport_constraint =  (translations.norm(dim=-1))**2
+        
+        dt = jacobian_flow[...,3].unsqueeze(0)
+        derivative_constraint = ((dt-v).norm(dim=-1))**2
+
+        return {
+            "derivative_constraint": derivative_constraint.mean()*1e2,
+            "transport_constraint": transport_constraint.mean()*1e2,
+        }
+
+    def implicit_transport(self, flowNet, gt):
+            gt_sdf = gt["sdf"]
+            gt_normals = gt["normals"]
+            
+            coords_4d = flowNet["model_in"]
+            coords_3d = flowNet["model_out"]
+
+            shape_model = self.shapeNet(coords_3d, preserve_grad=True)
+            coords_sdf = shape_model['model_in']
+            space_sdf = shape_model['model_out']
+            grad_shape = gradient(space_sdf, coords_sdf).clone().detach()
+            
+            jacobian_flow = jacobian(coords_3d, coords_4d)[0]
+
+            # grad_composed = grad_shape * jacobian_flow
+            grad_shape = grad_shape.squeeze(0).unsqueeze(1)
+            jacobian_flow = jacobian_flow.squeeze(0)
+            grad = torch.bmm(grad_shape, jacobian_flow).squeeze(1).unsqueeze(0)
+
+            # PDE constraints
+            transport_constraint = transport_equation(grad)
+            
+            #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+            grad = grad[:,:,0:3] 
+            
+            pred_sdf = space_sdf
+            # Initial-boundary constraints of the Eikonal equation at t=0
+            sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+            normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+            sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
+            grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
+
+            return {
+                "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
+                "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e1,
+                "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
+                "grad_constraint": grad_constraint.mean() * 1e2,
+                "transport_constraint": transport_constraint.mean()*1e2,
+            }
+        
+    # def hybrid_transport(self, flowNet, gt):
+    #         gt_sdf = gt["sdf"]
+    #         gt_normals = gt["normals"]
+            
+    #         coords_4d = flowNet["model_in"]
+    #         coords_3d = flowNet["model_out"]
+
+    #         shape_model = self.shapeNet(coords_3d, preserve_grad=True)
+    #         coords_sdf = shape_model['model_in']
+    #         space_sdf = shape_model['model_out']
+    #         grad_shape = gradient(space_sdf, coords_sdf).clone().detach()
+            
+    #         jacobian_flow = jacobian(coords_3d, coords_4d)[0]
+
+    #         # grad_composed = grad_shape * jacobian_flow
+    #         grad_shape = grad_shape.squeeze(0).unsqueeze(1)
+    #         jacobian_flow = jacobian_flow.squeeze(0)
+    #         grad = torch.bmm(grad_shape, jacobian_flow).squeeze(1).unsqueeze(0)
+
+    #         # PDE constraints
+    #         transport_constraint = transport_equation(grad)
+            
+    #         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+    #         grad = grad[:,:,0:3] 
+            
+    #         pred_sdf = space_sdf
+    #         # Initial-boundary constraints of the Eikonal equation at t=0
+    #         sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+    #         normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    #         sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
+    #         grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
+
+
+    #         v = torch.ones_like(gt_normals)
+    #         tv = v*coords_4d[...,3].unsqueeze(-1)
+    #         translations = coords_3d - (coords_4d[...,0:3] + tv)
+    #         initial_constraint =  (translations.norm(dim=-1))**2
+            
+    #         dt = jacobian_flow[...,3].unsqueeze(0)
+    #         derivative_constraint = ((dt-v).norm(dim=-1))**2
+
+    #         return {
+    #             "initial_constraint": initial_constraint.mean() * 3e3,
+    #             "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e1,
+    #             "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
+    #             "grad_constraint": grad_constraint.mean() * 1e2,
+    #             "transport_constraint": transport_constraint.mean()*1e2,
+    #         }
