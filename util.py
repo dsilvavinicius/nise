@@ -64,3 +64,16 @@ def jacobian(y, x):
         status = -1
 
     return jac, status
+
+
+def mean_curvature(y, x):
+    grad = gradient(y, x)
+    grad_norm = torch.norm(grad, dim=-1)
+    unit_grad = grad.squeeze(-1)/grad_norm.unsqueeze(-1)
+
+    Km = 0.5*divergence(unit_grad, x)
+    return Km
+
+
+def vector_dot(u, v):
+    return torch.sum(u * v, dim=-1, keepdim=True)

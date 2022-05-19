@@ -508,6 +508,91 @@ class SpaceTimePointCloud(Dataset):
         return samples
 
 
+class SpaceTimePointCloudNoMeshes(Dataset):
+    def __init__(self, mesh_paths, samples_on_surface, scaling=None,
+                 off_surface_sdf=None, off_surface_normals=None, batch_size=0,
+                 silent=False):
+        super().__init__()
+        self.n_epoch = 0
+        self.no_sampler = True
+        self.batch_size = batch_size
+
+    def __len__(self):
+        if self.no_sampler:
+            return 1#4 * self.samples_on_surface // self.batch_size
+        return self.samples_on_surface
+
+    def __getitem__(self, idx):
+        if self.no_sampler:
+            return self._random_sampling(self.batch_size)
+        raise NotImplementedError
+
+    def _random_sampling(self, n_points):
+        """Randomly samples points on the surface and function domain."""
+        
+        self.n_epoch += 1
+
+        # on_surface_count = n_points // 3
+        n_initial_conditions_samples = n_points // 3
+        n_space_samples = n_points - n_initial_conditions_samples
+
+        initial_conditions_samples = self._sample_init_conditions(n_initial_conditions_samples)
+        space_samples = self._sample_space(n_space_samples)
+
+        samples = torch.cat(
+            (initial_conditions_samples, space_samples),
+            dim=0
+        )
+
+        return {
+            "coords": samples[:, :4].float(),
+            "normals": samples[:, 4:7].float(),
+            "sdf": samples[:, -1].unsqueeze(-1).float(),
+        }
+
+    def _sample_init_conditions(self, n_points):
+        # Same principle here. We select the points off-surface and then
+        # distribute them along time.
+        off_surface_points = torch.from_numpy(np.random.uniform(-1, 1, size=(n_points, 3)))
+      
+        # Concatenating the time as a new coordinate => (x, y, z, t).
+        off_surface_points = torch.cat((
+            off_surface_points,
+            torch.zeros_like(off_surface_points[...,0]).unsqueeze(-1)
+        ), dim=1)
+
+        off_surface_samples = torch.cat((
+            off_surface_points,
+            torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32),
+            torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32),
+        ), dim=1)
+
+        return off_surface_samples
+
+    def _sample_space(self, n_points):
+        # Samples for intermediate times.
+        
+        #warning: it does not work when considering only one initial condition since min_time=max_time
+        #off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4)) 
+        space_points = np.random.uniform(-1, 1, size=(n_points, 3)) 
+        time_points = np.random.uniform(0, 1, size=(n_points, 1)) 
+        #time_points = np.random.uniform(0, np.clip((self.n_epoch/50000.), a_min=0, a_max=1), size=(n_points, 1)) 
+
+        #time_points = np.abs(np.random.normal(0, self.n_epoch/50000, size=(n_points, 1)))
+        off_spacetime_points = torch.cat((
+            torch.from_numpy(space_points.astype(np.float32)),
+            torch.from_numpy(time_points.astype(np.float32)),
+        ), dim=1)
+
+        samples = torch.cat((
+            off_spacetime_points,
+            torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32),
+            torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32),
+        ), dim=1)
+
+        return samples
+
+
 if __name__ == "__main__":
     meshes = [
         ("data/armadillo.ply", 0),

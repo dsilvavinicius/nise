@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import PointCloud, SpaceTimePointCloud
+from dataset import PointCloud, SpaceTimePointCloud, SpaceTimePointCloudNoMeshes
 from model import SIREN
 from samplers import SitzmannSampler
 from loss import loss_flow, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
@@ -162,11 +162,11 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
             mesh_resolution = train_config["mc_resolution"]
             
             # if space_time:
-            N = 5    # number of samples of the interval time
-            T = -0.2
+            N = 7    # number of samples of the interval time
+            # T = -0.2
             for i in range(N):
                 #T = 0.1*(i/(N-1))
-                #T = 0.4*(i/(N-1))
+                T = 1.*(i/(N-1))
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, _, normals, _ = create_mesh(
                     shapeNet,
@@ -176,7 +176,7 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
                     N=mesh_resolution,
                     device=device
                 )
-                T += 0.1
+                # T += 0.1
             # else:
             #     verts, _, normals, _ = create_mesh(
             #         model,
@@ -249,7 +249,8 @@ if __name__ == "__main__":
     datasets = parameter_dict["dataset"]
     for d in datasets:
         d[0] = os.path.join("data", d[0])
-    dataset = SpaceTimePointCloud(
+    # dataset = SpaceTimePointCloud(
+    dataset = SpaceTimePointCloudNoMeshes(
         datasets,
         sampling_config["samples_on_surface"],
         scaling=scaling,
@@ -267,7 +268,6 @@ if __name__ == "__main__":
             sampling_config["samples_off_surface"]
         )
 
-    
     #shapeNet = SIREN #3D -> 1D
     # launch the trained model
     shapeNet = SIREN(

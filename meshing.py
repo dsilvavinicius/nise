@@ -9,6 +9,8 @@ from skimage.measure import marching_cubes
 import time
 import torch
 
+from util import gradient, mean_curvature
+
 
 def create_mesh(
     shapeNet,
@@ -98,7 +100,8 @@ def create_mesh(
         if not silent:
             print(f"Saving mesh to {filename}")
 
-        save_ply(verts, faces, filename)
+        #save_ply(verts, faces, filename, shapeNet, flowNet, t)
+        save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t)
 
         if not silent:
             print("Done")
@@ -110,6 +113,34 @@ def eval_composedNet(shapeNet, flowNet, coords_4d):
     coords_3d = flowNet(coords_4d)['model_out']
     sdfs = shapeNet(coords_3d)['model_out']
     return sdfs
+
+
+def compute_curvatures(verts, shapeNet, flowNet, t):
+    num_verts = verts.shape[0]
+    coords = torch.from_numpy(verts).float().cuda()
+    times = t*torch.ones_like(coords[...,0].unsqueeze(-1))
+    coords_4d = torch.cat((coords, times), dim = -1)
+
+    pred_curvature = []
+    N = 200
+    for i in range(N):
+        coords_i = coords_4d[int(num_verts*i/N): int(num_verts*(i+1)/N),:]
+        
+        # model_output_i = decoder(coords_i.unsqueeze(0))
+        flowNet_model_i = flowNet(coords_i.unsqueeze(0))
+        coords_3d_i = flowNet_model_i['model_out']
+        coords_4d_i = flowNet_model_i['model_in']
+        model_output_i = shapeNet(coords_3d_i, preserve_grad=True)['model_out']
+        
+        #pred_curvature_i = mean_curvature(model_output_i, coords_4d_i).squeeze(0).cpu().detach().numpy()
+        pred_curvature_i = gradient(model_output_i, coords_4d_i)[...,0:3].squeeze(0).cpu().detach().numpy()
+        if len(pred_curvature)==0:
+            pred_curvature = pred_curvature_i
+        else:
+            pred_curvature = np.concatenate((pred_curvature, pred_curvature_i), axis=0)
+    
+    return pred_curvature
+
 
 def convert_sdf_samples_to_ply(
     pytorch_3d_sdf_tensor,
@@ -157,18 +188,50 @@ def convert_sdf_samples_to_ply(
     return mesh_points, faces, normals, values
 
 
-def save_ply(verts, faces, filename):
+def save_ply(verts, faces, filename, shapeNet, flowNet, t):
     # try writing to the ply file
     num_verts = verts.shape[0]
     num_faces = faces.shape[0]
 
     verts_tuple = np.zeros(
         (num_verts,),
-        dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")]
+        dtype=[("x", "f4"), ("y", "f4"), ("z", "f4"), ("quality", "f4")]
     )
 
+    curvatures = compute_curvatures(verts, shapeNet, flowNet, t)
+
     for i in range(0, num_verts):
-        verts_tuple[i] = tuple(verts[i, :])
+        verts_tuple[i] = tuple(verts[i, :]) + tuple(curvatures[i, :])
+
+    faces_building = []
+    for i in range(0, num_faces):
+        faces_building.append(((faces[i, :].tolist(),)))
+    faces_tuple = np.array(
+        faces_building,
+        dtype=[("vertex_indices", "i4", (3,))]
+    )
+
+    el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
+    el_faces = plyfile.PlyElement.describe(faces_tuple, "face")
+
+    ply_data = plyfile.PlyData([el_verts, el_faces])
+    ply_data.write(filename)
+
+
+def save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t):
+    # try writing to the ply file
+    num_verts = verts.shape[0]
+    num_faces = faces.shape[0]
+
+    verts_tuple = np.zeros(
+        (num_verts,),
+        dtype=[("x", "f4"), ("y", "f4"), ("z", "f4"), ("nx", "f4"), ("ny", "f4"), ("nz", "f4")]
+    )
+
+    grad = compute_curvatures(verts, shapeNet, flowNet, t)
+
+    for i in range(0, num_verts):
+        verts_tuple[i] = tuple(verts[i, :]) + tuple(grad[i, :])
 
     faces_building = []
     for i in range(0, num_faces):

@@ -4,7 +4,7 @@ from math import pi
 from numpy import identity
 import torch
 from torch.functional import F
-from util import gradient, jacobian
+from util import gradient, jacobian, vector_dot
 from util import divergence
 
 def on_surface_sdf_constraint(gt_sdf, pred_sdf):
@@ -94,22 +94,54 @@ def transport_equation(grad):
 
 def rotation_equation(grad, coords):
     #we consider the time as the angle of rotation in the plane (y,z)
-    theta = coords[:,:,3]
-    y = coords[:,:, 1]
-    z = coords[:,:, 2]
+    theta = coords[:,:,3].unsqueeze(-1)
+    y = coords[:,:, 1].unsqueeze(-1)
+    z = coords[:,:, 2].unsqueeze(-1)
 
-    ty = (- torch.sin(theta)*y - torch.cos(theta)*z)
-    tz = (torch.cos(theta)*y - torch.sin(theta)*z)
+    ft = grad[:,:,3].unsqueeze(-1)
+    fy = grad[:,:,1].unsqueeze(-1)
+    fz = grad[:,:,2].unsqueeze(-1)
 
-    return torch.abs( grad[:,:,3] + ty*grad[:,:,1] + tz*grad[:,:,2] )
+    ty = (-torch.sin(theta)*y - torch.cos(theta)*z)
+    tz = ( torch.cos(theta)*y - torch.sin(theta)*z)
+
+    return (ft + ty*fy + tz*fz)**2
  
 def sin_equation(grad, coords):
     #we consider the animate the x-coord using function sine
     pi = 3.14159265359
-    theta = 2*pi*coords[:,:,3]
+    theta = 2*pi*coords[...,3]
    
-    return torch.abs( grad[:,:,3] + pi*torch.cos(theta)*grad[:,:,0])
+    return torch.abs( grad[...,3] + pi*torch.cos(theta)*grad[...,1] + grad[...,2])
  
+
+def twist_vector_field(x):
+    X = x[...,0].unsqueeze(-1)
+    Y = x[...,1].unsqueeze(-1)
+    Z = x[...,2].unsqueeze(-1)
+    
+    vx = - 2. * Y * Z
+    vy = torch.zeros_like(vx)
+    vz =   2. * Y * X
+    return torch.cat((vx,vy,vz),dim=-1)
+
+
+def twist_parametric_constraint(x,y):
+    V = twist_vector_field(y)
+
+    jacobian_flow = jacobian(y, x)[0]
+    grad_t = jacobian_flow[...,3]
+    diff = grad_t - V
+    return (diff.norm(dim=-1))**2
+
+
+def level_set_equation(grad, x):
+    ft = grad[:,:,3].unsqueeze(-1)
+    grad = grad[...,0:3]
+    V = twist_vector_field(x)
+    dot = vector_dot(grad, V)
+    
+    return (ft + dot)**2
 
 def mean_curvature_equation(grad, x, scale = 0.00000001):
     ft = grad[:,:,3].unsqueeze(-1) # Partial derivative of the SIREN function f with respect to the time t
@@ -119,24 +151,32 @@ def mean_curvature_equation(grad, x, scale = 0.00000001):
     unit_grad = grad/grad_norm
     div = divergence(unit_grad, x)
 
-    #return torch.abs(ft - scale*grad_norm*div)
-    return torch.abs(ft - grad_norm*div)
+    return (ft - scale*grad_norm*div)**2
+    #return torch.abs(ft - grad_norm*div)
 
+def implict_function(x):
+    #sphere
+    X = x[...,0]
+    Y = x[...,1]    
+    Z = x[...,2]
+    return X**2 + Y**2 + Z**2 - 0.5**2
 
-def morphing_to_cube(grad, x):
+def morphing_to_implict_function(grad, x):
     ft = grad[...,3]
-    grad = grad[...,0:3]
-    grad_norm = torch.norm(grad, dim=-1)
-    #cube
-    X = torch.abs(x[...,0])
-    Y = torch.abs(x[...,1])
-    Z = torch.abs(x[...,2])
-    #dist = torch.maximum( torch.maximum(X, Y), Z) - 0.57
-    dist = X**8 + Y**8 + Z**8 - 0.57**8
-
-    return (ft - grad_norm*dist)**2
-    #return torch.abs(ft - grad_norm*dist)
+    grad_3d = grad[...,0:3]
+    grad_norm = torch.norm(grad_3d, dim=-1)
     
+    curv = divergence(grad_3d, x)#.clone().detach()
+    curv = torch.abs(curv.squeeze(-1))
+    curv = 10*curv / curv.max()
+
+    h = implict_function(x)
+    h1 = (h*curv).clone().detach()
+
+    return (ft - grad_norm*h1)**2
+    #return ft**2
+
+
 def morphing_to_sphere(grad, x):
     ft = grad[:,:,3]
     grad = grad[:,:,0:3]
@@ -675,6 +715,24 @@ def loss_vector_field_morph(X, gt):
 
 # flow versions
 
+def compute_composed_gradient(coords_4d, coords_3d, shapeNet):
+    shape_model = shapeNet(coords_3d, preserve_grad = True) 
+    coords_sdf = shape_model['model_in']
+    space_sdf = shape_model['model_out']
+    
+    return gradient(space_sdf, coords_4d)
+
+    # grad_shape = gradient(space_sdf, coords_sdf).clone().detach()
+    
+    # jacobian_flow = jacobian(coords_3d, coords_4d)[0]
+
+    # # grad_composed = grad_shape * jacobian_flow
+    # grad_shape = grad_shape.squeeze(0).unsqueeze(1)
+    # jacobian_flow = jacobian_flow.squeeze(0)
+
+    # return torch.bmm(grad_shape, jacobian_flow).squeeze(1).unsqueeze(0)
+
+
 class loss_flow(torch.nn.Module):
     def __init__(self, shapeNet):
         super().__init__()
@@ -684,12 +742,17 @@ class loss_flow(torch.nn.Module):
 
     def forward(self, flowNet, gt):
         #return self.transport(flowNet, gt)
-        return self.implicit_transport(flowNet, gt)
+        #return self.implicit_transport(flowNet, gt)
+        #return self.hybrid_transport(flowNet, gt)
+        #return self.hybrid_morph(flowNet, gt)
+        # return self.hybrid_mean_curvature(flowNet, gt)
+        #return self.hybrid_level_set_equation(flowNet, gt)
+        return self.twist_space(flowNet, gt)
+    
+    # def forward(self, flowNet, model_flowNet, gt):
+    #     return self.identity_inverse_level_set(flowNet, model_flowNet, gt)
     
     def transport(self, flowNet, gt):
-        gt_sdf = gt["sdf"]
-        gt_normals = gt["normals"]
-        
         coords_4d = flowNet["model_in"]
         coords_3d = flowNet["model_out"]
  
@@ -698,7 +761,7 @@ class loss_flow(torch.nn.Module):
         # grad_composed = grad_shape * jacobian_flow
         jacobian_flow = jacobian_flow.squeeze(0)
         
-        v = torch.ones_like(gt_normals)
+        v = torch.ones_like(coords_4d[...,0:3])
         tv = v*coords_4d[...,3].unsqueeze(-1)
         translations = coords_3d - (coords_4d[...,0:3] + tv)
         transport_constraint =  (translations.norm(dim=-1))**2
@@ -728,7 +791,7 @@ class loss_flow(torch.nn.Module):
             # grad_composed = grad_shape * jacobian_flow
             grad_shape = grad_shape.squeeze(0).unsqueeze(1)
             jacobian_flow = jacobian_flow.squeeze(0)
-            grad = torch.bmm(grad_shape, jacobian_flow).squeeze(1).unsqueeze(0)
+            grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
 
             # PDE constraints
             transport_constraint = transport_equation(grad)
@@ -750,52 +813,125 @@ class loss_flow(torch.nn.Module):
                 "grad_constraint": grad_constraint.mean() * 1e2,
                 "transport_constraint": transport_constraint.mean()*1e2,
             }
-        
-    # def hybrid_transport(self, flowNet, gt):
-    #         gt_sdf = gt["sdf"]
-    #         gt_normals = gt["normals"]
+
+    def hybrid_transport(self, flowNet, gt):
             
-    #         coords_4d = flowNet["model_in"]
-    #         coords_3d = flowNet["model_out"]
+            coords_4d = flowNet["model_in"]
+            coords_3d = flowNet["model_out"]
 
-    #         shape_model = self.shapeNet(coords_3d, preserve_grad=True)
-    #         coords_sdf = shape_model['model_in']
-    #         space_sdf = shape_model['model_out']
-    #         grad_shape = gradient(space_sdf, coords_sdf).clone().detach()
+            grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
+
+            # PDE constraints
+            implicit_transport_constraint = transport_equation(grad)
             
-    #         jacobian_flow = jacobian(coords_3d, coords_4d)[0]
-
-    #         # grad_composed = grad_shape * jacobian_flow
-    #         grad_shape = grad_shape.squeeze(0).unsqueeze(1)
-    #         jacobian_flow = jacobian_flow.squeeze(0)
-    #         grad = torch.bmm(grad_shape, jacobian_flow).squeeze(1).unsqueeze(0)
-
-    #         # PDE constraints
-    #         transport_constraint = transport_equation(grad)
+            translations = coords_3d - coords_4d[...,0:3]#(coords_4d[...,0:3] + tv)
+            vector_field_constraint = (translations.norm(dim=-1))**2
             
-    #         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
-    #         grad = grad[:,:,0:3] 
+            identity_constraint = torch.where(coords_4d[...,3]==0, vector_field_constraint, torch.zeros_like(vector_field_constraint)).unsqueeze(-1)
+
+            return {
+                "identity_constraint": identity_constraint.mean() * 1e4,
+                "transport_constraint": implicit_transport_constraint.mean()*1e2, 
+            }   
+
+
+    def hybrid_morph(self, flowNet, gt):
             
-    #         pred_sdf = space_sdf
-    #         # Initial-boundary constraints of the Eikonal equation at t=0
-    #         sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    #         normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
-    #         sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
-    #         grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
+            coords_4d = flowNet["model_in"]
+            coords_3d = flowNet["model_out"]
 
+            grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
 
-    #         v = torch.ones_like(gt_normals)
-    #         tv = v*coords_4d[...,3].unsqueeze(-1)
-    #         translations = coords_3d - (coords_4d[...,0:3] + tv)
-    #         initial_constraint =  (translations.norm(dim=-1))**2
+            # PDE constraints
+            morph_constraint = morphing_to_implict_function(grad, coords_4d)
+            grad_constraint = eikonal_constraint(grad[...,0:3]).unsqueeze(-1)
+            #mean_curv_constraint = mean_curvature_equation(grad, coords_4d, scale = 0.01)
+
+            translations = coords_3d - coords_4d[...,0:3]#(coords_4d[...,0:3] + tv)
+            vector_field_constraint = (translations.norm(dim=-1))**2
             
-    #         dt = jacobian_flow[...,3].unsqueeze(0)
-    #         derivative_constraint = ((dt-v).norm(dim=-1))**2
+            identity_constraint = torch.where(coords_4d[...,3]==0, vector_field_constraint, torch.zeros_like(vector_field_constraint)).unsqueeze(-1)
 
-    #         return {
-    #             "initial_constraint": initial_constraint.mean() * 3e3,
-    #             "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e1,
-    #             "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
-    #             "grad_constraint": grad_constraint.mean() * 1e2,
-    #             "transport_constraint": transport_constraint.mean()*1e2,
-    #         }
+            return {
+                "identity_constraint": identity_constraint.mean() * 1e5,
+                "morph_constraint": morph_constraint.mean()*1e1, 
+                "grad_constraint": grad_constraint.mean(),  
+                #"mean_curv_constraint": mean_curv_constraint.mean(), 
+            }  
+
+    def hybrid_mean_curvature(self, flowNet, gt):
+            
+            coords_4d = flowNet["model_in"]
+            coords_3d = flowNet["model_out"]
+
+            grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
+
+            # PDE constraints
+            mean_curvature_constraint = mean_curvature_equation(grad, coords_4d, scale = 1)
+            
+            # identity constraint
+            translations = coords_3d - coords_4d[...,0:3]
+            diff_constraint = (translations.norm(dim=-1))**2
+            identity_constraint = torch.where(coords_4d[...,3]==0, diff_constraint, torch.zeros_like(diff_constraint)).unsqueeze(-1)
+
+            return {
+                "identity_constraint": identity_constraint.mean()*1e3,
+                "mean_curvature_constraint": mean_curvature_constraint.mean(),
+            }
+
+
+    def twist_space(self, flowNet, gt):
+            
+            coords_4d = flowNet["model_in"]
+            coords_3d = flowNet["model_out"]
+
+            grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
+
+            # PDE constraints
+            #level_set_constraint = level_set_equation(grad, coords_4d)
+
+            # identity constraint
+            translations = coords_3d - coords_4d[...,0:3]
+            diff_constraint = (translations.norm(dim=-1))**2
+            identity_constraint = torch.where(coords_4d[...,3]==0, diff_constraint, torch.zeros_like(diff_constraint)).unsqueeze(-1)
+
+            diff_twist_constraint = twist_parametric_constraint(coords_4d,coords_3d)
+
+            return {
+                "identity_constraint": identity_constraint.sum(),
+                #"level_set_constraint": level_set_constraint.sum(),
+                "diff_twist_constraint": diff_twist_constraint.sum(),
+            }
+
+
+    def identity_inverse_level_set(self, flowNet, model_flowNet, gt):
+            
+            coords_4d = model_flowNet["model_in"]
+            coords_3d = model_flowNet["model_out"]
+
+            #grad = compute_composed_gradient(coords_4d, coords_3d, self.shapeNet)
+
+            # PDE constraints
+            #level_set_constraint = level_set_equation(grad, coords_4d)
+
+            # identity constraint
+            translations = coords_3d - coords_4d[...,0:3]
+            diff_constraint = (translations.norm(dim=-1))**2
+            identity_constraint = torch.where(coords_4d[...,3]==0, diff_constraint, torch.zeros_like(diff_constraint)).unsqueeze(-1)
+
+            # inverse constraint
+            coords = torch.cat((coords_3d, -coords_4d[..., 3].unsqueeze(-1)), dim=-1)
+            inverse_model = flowNet(coords)
+            diff_inv = coords_3d - inverse_model["model_out"]
+            diff_inv_constraint = (diff_inv.norm(dim=-1))**2
+            inverse_constraint = torch.where(coords_4d[...,3]!=0, diff_inv_constraint, torch.zeros_like(diff_inv_constraint)).unsqueeze(-1)
+
+            # PDE constraint
+            diff_twist_constraint = diff_twist(coords_4d,coords_3d)
+
+            return {
+                "identity_constraint": identity_constraint.sum(),
+                "inverse_constraint": inverse_constraint.sum(),
+                #"level_set_constraint": level_set_constraint.sum(),
+                "diff_twist_constraint": diff_twist_constraint.sum(),
+            }
