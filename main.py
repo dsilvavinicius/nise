@@ -162,11 +162,11 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
             mesh_resolution = train_config["mc_resolution"]
             
             # if space_time:
-            N = 7    # number of samples of the interval time
+            N = 9    # number of samples of the interval time
             # T = -0.2
             for i in range(N):
                 #T = 0.1*(i/(N-1))
-                T = 1.*(i/(N-1))
+                T = -1+2.*(i/(N-1))
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, _, normals, _ = create_mesh(
                     shapeNet,
@@ -244,30 +244,6 @@ if __name__ == "__main__":
     if off_surface_normals is not None:
         off_surface_normals = np.array(off_surface_normals)
 
-    scaling = parameter_dict.get("scaling")
-
-    datasets = parameter_dict["dataset"]
-    for d in datasets:
-        d[0] = os.path.join("data", d[0])
-    # dataset = SpaceTimePointCloud(
-    dataset = SpaceTimePointCloudNoMeshes(
-        datasets,
-        sampling_config["samples_on_surface"],
-        scaling=scaling,
-        off_surface_sdf=off_surface_sdf,
-        off_surface_normals=off_surface_normals,
-        batch_size=parameter_dict["batch_size"],
-        silent=False
-    )
-
-    sampler = None
-    sampler_opt = sampling_config.get("sampler")
-    if sampler_opt is not None and sampler_opt == "sitzmann":
-        sampler = SitzmannSampler(
-            dataset,
-            sampling_config["samples_off_surface"]
-        )
-
     #shapeNet = SIREN #3D -> 1D
     # launch the trained model
     shapeNet = SIREN(
@@ -291,6 +267,34 @@ if __name__ == "__main__":
         w0=parameter_dict["network"]["w0"]
     )
     print(flowNet)
+
+    scaling = parameter_dict.get("scaling")
+
+    datasets = parameter_dict["dataset"]
+    for d in datasets:
+        d[0] = os.path.join("data", d[0])
+    # dataset = SpaceTimePointCloud(
+    dataset = SpaceTimePointCloudNoMeshes(
+        datasets,
+        sampling_config["samples_on_surface"],
+        shapeNet,
+        flowNet,
+        scaling=scaling,
+        off_surface_sdf=off_surface_sdf,
+        off_surface_normals=off_surface_normals,
+        batch_size=parameter_dict["batch_size"],
+        silent=False
+    )
+
+    sampler = None
+    sampler_opt = sampling_config.get("sampler")
+    if sampler_opt is not None and sampler_opt == "sitzmann":
+        sampler = SitzmannSampler(
+            dataset,
+            sampling_config["samples_off_surface"]
+        )
+
+    
 
     opt_params = parameter_dict["optimizer"]
     if opt_params["type"] == "adam":
