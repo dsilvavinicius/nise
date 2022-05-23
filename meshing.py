@@ -100,8 +100,8 @@ def create_mesh(
         if not silent:
             print(f"Saving mesh to {filename}")
 
-        #save_ply(verts, faces, filename, shapeNet, flowNet, t)
-        save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t)
+        save_ply(verts, faces, filename, shapeNet, flowNet, t)
+        #save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t)
 
         if not silent:
             print("Done")
@@ -115,6 +115,19 @@ def eval_composedNet(shapeNet, flowNet, coords_4d):
     return sdfs
 
 
+
+def compute_textures(verts, flowNet, t):
+    coords = torch.from_numpy(verts).float().cuda()
+    times = t*torch.ones_like(coords[...,0].unsqueeze(-1))
+    coords_4d = torch.cat((coords, times), dim = -1)
+
+    flowNet_model_i = flowNet(coords_4d.unsqueeze(0))
+    coords_3d = flowNet_model_i['model_out']
+
+    textures = 100*coords_3d[...,0].unsqueeze(-1)%2
+
+    return textures
+
 def compute_curvatures(verts, shapeNet, flowNet, t):
     num_verts = verts.shape[0]
     coords = torch.from_numpy(verts).float().cuda()
@@ -127,13 +140,22 @@ def compute_curvatures(verts, shapeNet, flowNet, t):
         coords_i = coords_4d[int(num_verts*i/N): int(num_verts*(i+1)/N),:]
         
         # model_output_i = decoder(coords_i.unsqueeze(0))
+        # for the curvature of the initial surface
+        #coords_3d_i = coords_i[...,0:3]
+
+        # for the curvature of the deformed surfaces
         flowNet_model_i = flowNet(coords_i.unsqueeze(0))
         coords_3d_i = flowNet_model_i['model_out']
-        coords_4d_i = flowNet_model_i['model_in']
-        model_output_i = shapeNet(coords_3d_i, preserve_grad=True)['model_out']
+        #coords_4d_i = flowNet_model_i['model_in']
+
+        #model_shapeNet = shapeNet(coords_3d_i, preserve_grad=True)
+        model_shapeNet = shapeNet(coords_3d_i)
+        model_output_i = model_shapeNet['model_out']
+        model_input_i = model_shapeNet['model_in']
         
+        pred_curvature_i = mean_curvature(model_output_i, model_input_i).squeeze(0).cpu().detach().numpy()
         #pred_curvature_i = mean_curvature(model_output_i, coords_4d_i).squeeze(0).cpu().detach().numpy()
-        pred_curvature_i = gradient(model_output_i, coords_4d_i)[...,0:3].squeeze(0).cpu().detach().numpy()
+        #pred_curvature_i = gradient(model_output_i, coords_4d_i)[...,0:3].squeeze(0).cpu().detach().numpy()
         if len(pred_curvature)==0:
             pred_curvature = pred_curvature_i
         else:
@@ -198,8 +220,9 @@ def save_ply(verts, faces, filename, shapeNet, flowNet, t):
         dtype=[("x", "f4"), ("y", "f4"), ("z", "f4"), ("quality", "f4")]
     )
 
-    curvatures = compute_curvatures(verts, shapeNet, flowNet, t)
-
+    #curvatures = compute_curvatures(verts, shapeNet, flowNet, t)
+    curvatures = compute_textures(verts, flowNet, t).squeeze(0).cpu().detach().numpy()
+    
     for i in range(0, num_verts):
         verts_tuple[i] = tuple(verts[i, :]) + tuple(curvatures[i, :])
 
