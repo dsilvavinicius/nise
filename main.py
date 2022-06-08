@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import PointCloud, SpaceTimePointCloud
+from dataset import PointCloud, SpaceTimePointCloud, SpaceTimePointCloudNI
 from model import SIREN
 from samplers import SitzmannSampler
 from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
@@ -162,9 +162,9 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 7    # number of samples of the interval time
+                N = 5    # number of samples of the interval time
                 for i in range(N):
-                    T = 0.2*(i/(N-1))
+                    T = -1+2*(i/(N-1))
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -248,31 +248,25 @@ if __name__ == "__main__":
     scaling = parameter_dict.get("scaling")
 
     dataset = None
-    if space_time:
-        datasets = parameter_dict["dataset"]
-        for d in datasets:
-            d[0] = os.path.join("data", d[0])
-        dataset = SpaceTimePointCloud(
-            datasets,
-            sampling_config["samples_on_surface"],
-            scaling=scaling,
-            off_surface_sdf=off_surface_sdf,
-            off_surface_normals=off_surface_normals,
-            batch_size=parameter_dict["batch_size"],
-            silent=False
-        )
-    else:
-        dataset = PointCloud(
-            os.path.join("data", parameter_dict["dataset"]),
-            sampling_config["samples_on_surface"],
-            scaling=scaling,
-            off_surface_sdf=off_surface_sdf,
-            off_surface_normals=off_surface_normals,
-            random_surf_samples=sampling_config["random_surf_samples"],
-            no_sampler=no_sampler,
-            batch_size=parameter_dict["batch_size"],
-            silent=False
-        )
+    datasets = parameter_dict["dataset"]
+    for d in datasets:
+        d[0] = os.path.join("data", d[0])
+
+    if len(datasets[0]) == 3:
+        pretrained_ni = SIREN(3, 1, [128, 128, 128], w0=30)
+        pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
+        pretrained_ni.eval()
+        pretrained_ni.to(device) 
+        datasets[0] = [datasets[0][0], datasets[0][2]]
+
+    dataset = SpaceTimePointCloudNI(
+        datasets,
+        sampling_config["samples_on_surface"],
+        pretrained_ni=[pretrained_ni],
+        batch_size=parameter_dict["batch_size"],
+        silent=False,
+        device=device
+    )
 
     sampler = None
     sampler_opt = sampling_config.get("sampler")

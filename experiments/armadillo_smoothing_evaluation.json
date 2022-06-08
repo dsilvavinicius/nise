@@ -1,0 +1,30 @@
+{
+    "description": "SIREN Learning of the Armadillo mesh.",
+    "space_time": true,
+    "num_epochs": 52000,
+    "sampling_opts": {
+        "samples_on_surface": 80000,
+        "samples_off_surface": 80000,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "dataset": [["armadillo.ply", "shapeNets/armadillo-2x128_w0-30.pth", -1]],
+    "batch_size": 20000,
+    "checkpoint_path": "logs",
+    "experiment_name": "armadillo_test_evaluation",
+    "epochs_to_checkpoint": 50,
+    "epochs_to_reconstruction": 50,
+    "loss": "loss_mean_curv",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 128,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [256,256],
+        "w0": 30
+    }
+}
