@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud, SpaceTimePointCloudNoMeshes
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import loss_flow, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
+from loss import loss_flow, loss_flow_morph, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -165,8 +165,8 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
             N = 9    # number of samples of the interval time
             # T = -0.2
             for i in range(N):
-                #T = 0.1*(i/(N-1))
-                T = -1+2.*(i/(N-1))
+                #T = (i/(N-1))
+                T = 1.*(i/(N-1))
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, _, normals, _ = create_mesh(
                     shapeNet,
@@ -252,7 +252,8 @@ if __name__ == "__main__":
                 hidden_layer_config=[128,128,128],
                 w0=30
             )
-    shapeNet.load_state_dict(torch.load('./shapeNets/smpl_red-2x128_w0-30_teste.pth'), strict=False)
+    #shapeNet.load_state_dict(torch.load('./shapeNets/smpl_red-2x128_w0-30_teste.pth'), strict=False)
+    shapeNet.load_state_dict(torch.load('./shapeNets/armadillo-2x128_w0-30.pth'), strict=False)
     shapeNet.cuda()
     print(shapeNet)
     
@@ -327,6 +328,7 @@ if __name__ == "__main__":
     #         warnings.warn(f"Invalid loss function option {loss}. Using default.")
     
     loss_fn = loss_flow(shapeNet)
+    #loss_fn = loss_flow_morph(shapeNet)
 
     config_dict = {
         "epochs": parameter_dict["num_epochs"],

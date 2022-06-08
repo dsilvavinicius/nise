@@ -538,11 +538,14 @@ class SpaceTimePointCloudNoMeshes(Dataset):
         n_initial_conditions_samples = n_points // 4
         n_space_samples = n_points - n_initial_conditions_samples
 
-        initial_conditions_samples = self._sample_init_conditions(n_initial_conditions_samples)
+        initial_conditions_samples_time0 = self._sample_init_conditions(n_initial_conditions_samples, time=0)
+        #initial_conditions_samples_time1 = self._sample_init_conditions(n_initial_conditions_samples, time=1)
+        #initial_conditions_samples = self._sample_init_conditions(n_initial_conditions_samples, time=0)
         space_samples = self._sample_space(n_space_samples)
 
         samples = torch.cat(
-            (initial_conditions_samples, space_samples),
+            #(initial_conditions_samples_time0,initial_conditions_samples_time1, space_samples),
+            (initial_conditions_samples_time0, space_samples),
             dim=0
         )
 
@@ -552,7 +555,7 @@ class SpaceTimePointCloudNoMeshes(Dataset):
             "sdf": samples[:, -1].unsqueeze(-1).float(),
         }
 
-    def _sample_init_conditions(self, n_points):
+    def _sample_init_conditions(self, n_points, time = 0.0):
         # Same principle here. We select the points off-surface and then
         # distribute them along time.
 
@@ -569,12 +572,12 @@ class SpaceTimePointCloudNoMeshes(Dataset):
         # off_surface_points = off_surface_points[:n_points,...].clone().detach()
         # self.shapeNet.train()
 
-        off_surface_points = torch.from_numpy(np.random.uniform(-1, 1, size=(n_points, 3)))
+        off_surface_points = torch.from_numpy(np.random.uniform(-1.2, 1.2, size=(n_points, 3)))
 
         # Concatenating the time as a new coordinate => (x, y, z, t).
         off_surface_points = torch.cat((
             off_surface_points,
-            torch.zeros_like(off_surface_points[...,0]).unsqueeze(-1)
+            time*torch.ones_like(off_surface_points[...,0]).unsqueeze(-1)
             #-1*torch.ones_like(off_surface_points[...,0]).unsqueeze(-1)
         ), dim=1)
 
@@ -591,9 +594,9 @@ class SpaceTimePointCloudNoMeshes(Dataset):
         
         #warning: it does not work when considering only one initial condition since min_time=max_time
         #off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4)) 
-        space_points = np.random.uniform(-1, 1, size=(n_points, 3)) 
-        time_points = np.random.uniform(-1, 1, size=(n_points, 1)) 
-        #time_points = np.random.uniform(-1, -1+2*np.clip((self.n_epoch/50000.), a_min=0, a_max=1), size=(n_points, 1)) 
+        space_points = np.random.uniform(-1.2, 1.2, size=(n_points, 3)) 
+        time_points = np.random.uniform(0, 1, size=(n_points, 1)) 
+        #time_points = np.random.uniform(0, np.clip((self.n_epoch/50000.), a_min=0, a_max=1), size=(n_points, 1)) 
 
         #time_points = np.abs(np.random.normal(0, self.n_epoch/50000, size=(n_points, 1)))
         off_spacetime_points = torch.cat((

@@ -6,6 +6,7 @@ import shutil
 from warnings import warn
 import torch
 from torch.autograd import grad
+import torch.nn.functional as F
 
 def create_output_paths(checkpoint_path, experiment_name, overwrite=True):
     """Helper function to create the output folders. Returns the resulting path.
@@ -77,3 +78,6 @@ def mean_curvature(y, x):
 
 def vector_dot(u, v):
     return torch.sum(u * v, dim=-1, keepdim=True)
+
+def direction_aligment_on_surf(u, v):
+    return 1 - F.cosine_similarity(u, v, dim=-1)[..., None]

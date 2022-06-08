@@ -13,20 +13,20 @@
     "off_surface_normals": [-1, -1, -1],
     "batch_size":60000,
     "checkpoint_path": "logs",
-    "experiment_name": "composition_rede-1x128_w0-20_parametric_twist",
-    "epochs_to_checkpoint": 2000,
-    "epochs_to_reconstruction": 2000,
+    "experiment_name": "composition_rede-1x256_w0-30_armadillo2sphere",
+    "epochs_to_checkpoint": 5000,
+    "epochs_to_reconstruction": 5000,
     "loss": "loss_flow_transport",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4
     },
     "reconstruction": {
-        "resolution": 128,
+        "resolution": 256,
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [128,128],
-        "w0": 20
+        "hidden_layer_nodes": [256,256],
+        "w0": 30
     }
 }

@@ -30,7 +30,7 @@ def create_mesh(
 
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
     voxel_origin = [-1, -1, -1]
-    voxel_size = 2.0 / (N - 1)
+    voxel_size =   2.0 / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
     
@@ -100,8 +100,8 @@ def create_mesh(
         if not silent:
             print(f"Saving mesh to {filename}")
 
-        save_ply(verts, faces, filename, shapeNet, flowNet, t)
-        #save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t)
+        #save_ply(verts, faces, filename, shapeNet, flowNet, t)
+        save_ply_with_grad(verts, faces, filename, shapeNet, flowNet, t)
 
         if not silent:
             print("Done")
@@ -146,16 +146,16 @@ def compute_curvatures(verts, shapeNet, flowNet, t):
         # for the curvature of the deformed surfaces
         flowNet_model_i = flowNet(coords_i.unsqueeze(0))
         coords_3d_i = flowNet_model_i['model_out']
-        #coords_4d_i = flowNet_model_i['model_in']
+        coords_4d_i = flowNet_model_i['model_in']
 
-        #model_shapeNet = shapeNet(coords_3d_i, preserve_grad=True)
-        model_shapeNet = shapeNet(coords_3d_i)
+        model_shapeNet = shapeNet(coords_3d_i, preserve_grad=True)
+        #model_shapeNet = shapeNet(coords_3d_i)
         model_output_i = model_shapeNet['model_out']
         model_input_i = model_shapeNet['model_in']
         
-        pred_curvature_i = mean_curvature(model_output_i, model_input_i).squeeze(0).cpu().detach().numpy()
+        #pred_curvature_i = mean_curvature(model_output_i, model_input_i).squeeze(0).cpu().detach().numpy()
         #pred_curvature_i = mean_curvature(model_output_i, coords_4d_i).squeeze(0).cpu().detach().numpy()
-        #pred_curvature_i = gradient(model_output_i, coords_4d_i)[...,0:3].squeeze(0).cpu().detach().numpy()
+        pred_curvature_i = gradient(model_output_i, coords_4d_i)[...,0:3].squeeze(0).cpu().detach().numpy()
         if len(pred_curvature)==0:
             pred_curvature = pred_curvature_i
         else:
