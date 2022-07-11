@@ -49,3 +49,13 @@ def gradient(y, x, grad_outputs=None):
         create_graph=True
     )[0]
     return grad
+
+def vector_dot(u, v):
+    return torch.sum(u * v, dim=-1, keepdim=True)
+
+def mean_curvature(grad, x):
+    #grad_norm = torch.norm(grad, dim=-1)
+    unit_grad = grad#/grad_norm.unsqueeze(-1)
+
+    Km = divergence(unit_grad, x)
+    return Km

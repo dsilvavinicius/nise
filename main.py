@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud, SpaceTimePointCloudNI
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
+from loss import loss_level_set, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -162,9 +162,10 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 5    # number of samples of the interval time
+                N = 6    # number of samples of the interval time
+                T=0
                 for i in range(N):
-                    T = -1+2*(i/(N-1))
+                    #T = -1 + 2*(i/(N-1)) 
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -173,6 +174,7 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                         N=mesh_resolution,
                         device=device
                     )
+                    T+=0.1
             else:
                 verts, _, normals, _ = create_mesh(
                     model,
@@ -253,15 +255,28 @@ if __name__ == "__main__":
         d[0] = os.path.join("data", d[0])
 
     if len(datasets[0]) == 3:
-        pretrained_ni = SIREN(3, 1, [128, 128, 128], w0=30)
+        #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+        pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=60)
         pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
         pretrained_ni.eval()
         pretrained_ni.to(device) 
         datasets[0] = [datasets[0][0], datasets[0][2]]
 
+    # TODO: think in how to consider multiples trained sirens
+    # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
+    # pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    # pretrained_ni1.eval()
+    # pretrained_ni1.to(device) 
+
+    # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/armadillo-2x128_w0-30.pth'))
+    # pretrained_ni2.eval()
+    # pretrained_ni2.to(device) 
+
     dataset = SpaceTimePointCloudNI(
         datasets,
         sampling_config["samples_on_surface"],
+        #pretrained_ni=[pretrained_ni1],
         pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
@@ -319,6 +334,12 @@ if __name__ == "__main__":
             loss_fn = loss_transport
         elif loss == "loss_vector_field_morph":
             loss_fn = loss_vector_field_morph
+        elif loss == "loss_GPNF":
+            loss_fn = loss_GPNF(pretrained_ni)
+        elif loss == "loss_level_set":
+            loss_fn = loss_level_set(pretrained_ni)
+        elif loss == "loss_morphing_two_sirens":
+            loss_fn = loss_morphing_two_sirens(pretrained_ni1, pretrained_ni2)
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 

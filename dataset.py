@@ -609,7 +609,7 @@ class SpaceTimePointCloudNI(Dataset):
 
     def __len__(self):
         if self.no_sampler:
-            return 3 * self.samples_on_surface // self.batch_size
+            return 4 * self.samples_on_surface // self.batch_size
         return self.samples_on_surface
 
     def __getitem__(self, idx):
@@ -627,12 +627,15 @@ class SpaceTimePointCloudNI(Dataset):
         off_surface_count = on_surface_count
         intermediate_count = n_points - (on_surface_count + off_surface_count)
 
-        on_surface_samples = self._sample_on_surface_init_conditions(on_surface_count)
-        off_surface_samples = self._sample_off_surface_init_conditions(off_surface_count).cpu()
+        #on_surface_samples = self._sample_on_surface_init_conditions(on_surface_count)
+        #off_surface_samples = self._sample_off_surface_init_conditions(off_surface_count).cpu()
+        surface_samples = self._sample_surface_init_conditions(off_surface_count).cpu()
+        #surface_samples = self._sample_surface_init_conditions_no_net(off_surface_count).cpu()
         intermediate_samples = self._sample_intermediate_times(intermediate_count)
 
         samples = torch.cat(
-            (on_surface_samples, off_surface_samples, intermediate_samples),
+            #(on_surface_samples, off_surface_samples, intermediate_samples),
+            (surface_samples, intermediate_samples),
             dim=0
         )
 
@@ -641,6 +644,119 @@ class SpaceTimePointCloudNI(Dataset):
             "normals": samples[:, 4:7].float(),
             "sdf": samples[:, -1].unsqueeze(-1).float(),
         }
+
+
+    def _sample_surface_init_conditions_no_net(self, n_points):
+        # Same principle here. We select the points off-surface and then
+        # distribute them along time.
+        off_surface_points = np.random.uniform(-1, 1, size=(n_points, 3))
+        unique_times = torch.unique(self.surface_samples[:, 3])
+        times = np.random.choice(
+            unique_times,
+            size=2*n_points,
+            replace=True
+        )
+
+        idx = np.random.choice(
+            range(self.surface_samples.shape[0]),
+            size=n_points,
+            replace=False
+        )
+
+        on_surface_coords = self.surface_samples[idx, 0:3]
+        surface_coords = torch.cat((on_surface_coords, torch.from_numpy(off_surface_points)))
+
+        # Concatenating the time as a new coordinate => (x, y, z, t).
+        off_surface_points = torch.cat((
+            surface_coords,
+            torch.from_numpy(times).unsqueeze(-1)
+        ), dim=1).float().to(self.device)
+
+        # Estimating the SDF and normals for each initial condition.
+        num_times = len(unique_times)
+        off_surface_coords, off_surface_sdf, off_surface_normals = None, None, None
+        
+        for i in range(num_times):
+            points_idx = off_surface_points[:, -1] == unique_times[i]
+
+            if off_surface_sdf is None:
+                off_surface_coords = off_surface_points[points_idx, :]
+                off_surface_sdf = torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32).cuda()#[:, np.newaxis]
+                off_surface_normals = torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32).cuda()
+                continue
+
+            off_surface_coords = torch.cat((off_surface_coords, off_surface_points[points_idx, :]), dim=0)
+            off_surface_sdf = torch.cat((off_surface_sdf, torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32).cuda()), dim=0)
+            off_surface_normals = torch.cat((off_surface_normals, torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32).cuda()), dim=0)
+
+        off_surface_samples = torch.cat((
+            off_surface_coords,
+            off_surface_normals,
+            off_surface_sdf
+        ), dim=1).float()
+
+        return off_surface_samples.clone().detach()
+
+
+
+    def _sample_surface_init_conditions(self, n_points):
+        # Same principle here. We select the points off-surface and then
+        # distribute them along time.
+        off_surface_points = np.random.uniform(-1, 1, size=(n_points, 3))
+        unique_times = torch.unique(self.surface_samples[:, 3])
+        times = np.random.choice(
+            unique_times,
+            size=2*n_points,
+            replace=True
+        )
+
+        idx = np.random.choice(
+            range(self.surface_samples.shape[0]),
+            size=n_points,
+            replace=False
+        )
+
+        on_surface_coords = self.surface_samples[idx, 0:3]
+        surface_coords = torch.cat((on_surface_coords, torch.from_numpy(off_surface_points)))
+
+        # Concatenating the time as a new coordinate => (x, y, z, t).
+        off_surface_points = torch.cat((
+            surface_coords,
+            torch.from_numpy(times).unsqueeze(-1)
+        ), dim=1).float().to(self.device)
+
+        # Estimating the SDF and normals for each initial condition.
+        num_times = len(unique_times)
+        off_surface_coords, off_surface_sdf, off_surface_normals = None, None, None
+        
+        for i in range(num_times):
+            points_idx = off_surface_points[:, -1] == unique_times[i]
+            model_sdf_i = self.pretrained_ni[i](
+                off_surface_points[points_idx, :-1].to(self.device)
+            )
+            
+            sdf_i = model_sdf_i['model_out']
+            normals_i = gradient(sdf_i, model_sdf_i['model_in'])
+
+            if off_surface_sdf is None:
+                off_surface_coords = off_surface_points[points_idx, :]
+                off_surface_sdf = sdf_i#[:, np.newaxis]
+                off_surface_normals = normals_i
+                continue
+
+            off_surface_coords = torch.cat((off_surface_coords, off_surface_points[points_idx, :]), dim=0)
+            off_surface_sdf = torch.cat((off_surface_sdf, sdf_i), dim=0)
+            off_surface_normals = torch.cat((off_surface_normals, normals_i), dim=0)
+
+        off_surface_samples = torch.cat((
+            off_surface_coords,
+            off_surface_normals,
+            off_surface_sdf
+        ), dim=1).float()
+
+        return off_surface_samples.clone().detach()
+
+
 
     def _sample_on_surface_init_conditions(self, n_points):
         # Selecting the points on surface. Each mesh has `samples_on_surface`
@@ -704,7 +820,7 @@ class SpaceTimePointCloudNI(Dataset):
 
     def _sample_intermediate_times(self, n_points):
         # Samples for intermediate times.
-        #off_spacetime_points = np.random.uniform(-1, 1, size=(n_points, 4))
+        #off_spacetime_points = np.random.uniform(-0.6, 0.6, size=(n_points, 4))
         off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4))
         # warning: time goes from -1 to 1
         samples = torch.cat((
