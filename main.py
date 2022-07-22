@@ -16,6 +16,8 @@ from loss import loss_flow, loss_flow_morph, loss_mean_curv, sdf_sitzmann, true_
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
+import kaolin
+
 
 def train_model(dataset, model, device, train_config, shapeNet=None, space_time=False, silent=False):
     BATCH_SIZE = train_config["batch_size"]
@@ -153,6 +155,8 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
                 os.path.join(full_path, "models", f"model_{epoch}.pth")
             )
 
+
+
         # reconstructing a mesh at checkpoints
         if epoch and EPOCHS_TIL_RECONSTRUCTION and not epoch % EPOCHS_TIL_RECONSTRUCTION:
             if not silent:
@@ -162,13 +166,13 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
             mesh_resolution = train_config["mc_resolution"]
             
             # if space_time:
-            N = 9    # number of samples of the interval time
+            N = 3    # number of samples of the interval time
             # T = -0.2
             for i in range(N):
-                #T = (i/(N-1))
+                #T = 0
                 T = 1.*(i/(N-1))
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
-                verts, _, normals, _ = create_mesh(
+                verts, faces, normals, _ = create_mesh(
                     shapeNet,
                     flowNet=model,
                     filename=os.path.join(full_path, "reconstructions", mesh_file), 
@@ -176,6 +180,9 @@ def train_model(dataset, model, device, train_config, shapeNet=None, space_time=
                     N=mesh_resolution,
                     device=device
                 )
+                tensor_faces = torch.from_numpy(faces.copy())
+                tensor_verts = torch.from_numpy(verts.copy())
+                timelapse.add_mesh_batch(category=f"output_{i}", iteration=epoch/EPOCHS_TIL_RECONSTRUCTION, faces_list=[tensor_faces], vertices_list=[tensor_verts])
                 # T += 0.1
             # else:
             #     verts, _, normals, _ = create_mesh(
@@ -228,6 +235,8 @@ if __name__ == "__main__":
         overwrite=False
     )
 
+    timelapse = kaolin.visualize.Timelapse(os.path.join(full_path, "kaolin"))
+
     # consider the spacetime (x,y,z,t) as domain
     n_in_features = 4
 
@@ -252,8 +261,8 @@ if __name__ == "__main__":
                 hidden_layer_config=[128,128,128],
                 w0=30
             )
-    #shapeNet.load_state_dict(torch.load('./shapeNets/smpl_red-2x128_w0-30_teste.pth'), strict=False)
-    shapeNet.load_state_dict(torch.load('./shapeNets/armadillo-2x128_w0-30.pth'), strict=False)
+    shapeNet.load_state_dict(torch.load('./shapeNets/smpl_red-2x128_w0-30_teste.pth'), strict=False)
+    #shapeNet.load_state_dict(torch.load('./shapeNets/armadillo-2x128_w0-30.pth'), strict=False)
     shapeNet.cuda()
     print(shapeNet)
     

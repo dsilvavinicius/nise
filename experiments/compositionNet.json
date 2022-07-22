@@ -13,9 +13,9 @@
     "off_surface_normals": [-1, -1, -1],
     "batch_size":60000,
     "checkpoint_path": "logs",
-    "experiment_name": "composition_rede-1x256_w0-30_armadillo2sphere",
-    "epochs_to_checkpoint": 5000,
-    "epochs_to_reconstruction": 5000,
+    "experiment_name": "composition_rede-1x256_w0-30_kaolin_test",
+    "epochs_to_checkpoint": 200,
+    "epochs_to_reconstruction": 200,
     "loss": "loss_flow_transport",
     "optimizer": {
         "type": "adam",

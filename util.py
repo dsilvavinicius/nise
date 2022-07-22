@@ -20,6 +20,8 @@ def create_output_paths(checkpoint_path, experiment_name, overwrite=True):
 
     os.makedirs(os.path.join(full_path, "models"))
     os.makedirs(os.path.join(full_path, "reconstructions"))
+    os.makedirs(os.path.join(full_path, "kaolin"))
+
     return full_path
 
 

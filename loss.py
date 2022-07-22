@@ -766,10 +766,10 @@ class loss_flow(torch.nn.Module):
         #return self.implicit_transport(flowNet, gt)
         #return self.hybrid_transport(flowNet, gt)
         #return self.hybrid_morph(flowNet, gt)
-        return self.hybrid_morph_faster(flowNet, gt)
+        #return self.hybrid_morph_faster(flowNet, gt)
         # return self.hybrid_mean_curvature(flowNet, gt)
         #return self.hybrid_level_set_equation(flowNet, gt)
-        #return self.twist_space(flowNet, gt)
+        return self.twist_space(flowNet, gt)
     
     # def forward(self, flowNet, model_flowNet, gt):
     #     return self.identity_inverse_level_set(flowNet, model_flowNet, gt)
