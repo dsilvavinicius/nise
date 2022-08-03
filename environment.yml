@@ -10,7 +10,7 @@ dependencies:
   - plyfile
   - pytorch
   - tensorboard
+   - kaolin
   - pip
   - pip:  
     - mesh-to-sdf
-    - kaolin
