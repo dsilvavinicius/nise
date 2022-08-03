@@ -9,15 +9,16 @@ import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import PointCloud, SpaceTimePointCloud, SpaceTimePointCloudNI
+from dataset import   SpaceTimePointCloud, SpaceTimePointCloudNI
 from model import SIREN
 from samplers import SitzmannSampler
 from loss import loss_level_set, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
+import kaolin
 
-def train_model(dataset, model, device, train_config, space_time=False, silent=False):
+def train_model(dataset, model, device, train_config, silent=False):
     BATCH_SIZE = train_config["batch_size"]
     EPOCHS = train_config["epochs"]
     EPOCHS_TIL_CHECKPOINT = 0
@@ -54,15 +55,6 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
         os.makedirs(summary_path)
     writer = SummaryWriter(summary_path)
 
-    # Adding the input point cloud to the summary
-    # As it turns out, this increases the summary size to a point that the
-    # browser hangs.
-    # writer.add_mesh(
-    #     tag="input_point_cloud",
-    #     vertices=torch.from_numpy(dataset.point_cloud.points).unsqueeze(0),
-    #     colors=torch.from_numpy(dataset.point_cloud.normals).unsqueeze(0)
-    # )
-
     losses = dict()
     for epoch in range(EPOCHS):
         running_loss = dict()
@@ -96,33 +88,6 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     running_loss[it] = l.item()
                 else:
                     running_loss[it] += l.item()
-
-            # Adding an iteration of the training data to tensorboard
-            # if space_time:
-                # coords_time0 = data["coords"][data["coords"][..., 3] == 0]
-                # colors = torch.zeros_like(coords_time0[..., 0:3], device="cpu", requires_grad=False)
-                # sdf_time0 = data["sdf"][data["coords"][..., 3] == 0]
-                # inputs = coords_time0[..., 0:3].to(device)
-
-                # #at time zero
-                # colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-                # colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-                # colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
-
-                # writer.add_mesh(
-                #     "input", inputs.unsqueeze(-1), colors=colors.unsqueeze(-1), global_step=epoch
-                # )
-            if not space_time:
-                colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
-            
-                #at time zero
-                colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-                colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-                colors[data["sdf"].squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
-
-                writer.add_mesh(
-                    "input", inputs, colors=colors, global_step=epoch
-                )
 
             writer.add_scalar("train_loss", train_loss.item(), epoch)
 
@@ -161,27 +126,22 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
             
-            if space_time:
-                N = 6    # number of samples of the interval time
-                T=0
-                for i in range(N):
-                    #T = -1 + 2*(i/(N-1)) 
-                    mesh_file = f"epoch_{epoch}_time_{T}.ply"
-                    verts, _, normals, _ = create_mesh(
-                        model,
-                        filename=os.path.join(full_path, "reconstructions", mesh_file), 
-                        t=T,  # time instant for 4d SIREN function
-                        N=mesh_resolution,
-                        device=device
-                    )
-                    T+=0.1
-            else:
-                verts, _, normals, _ = create_mesh(
+            N = 7    # number of samples of the interval time
+            for i in range(N):
+                T = -1 + 2*(i/(N-1)) 
+                mesh_file = f"epoch_{epoch}_time_{T}.ply"
+                verts, faces, normals, _ = create_mesh(
                     model,
-                    filename=os.path.join(full_path, "reconstructions", mesh_file),
+                    filename=os.path.join(full_path, "reconstructions", mesh_file), 
+                    t=T,  # time instant for 4d SIREN function
                     N=mesh_resolution,
                     device=device
                 )
+
+                #adding checkpoint to kaolin
+                tensor_faces = torch.from_numpy(faces.copy())
+                tensor_verts = torch.from_numpy(verts.copy())
+                timelapse.add_mesh_batch(category=f"output_{i}", iteration=epoch/EPOCHS_TIL_RECONSTRUCTION, faces_list=[tensor_faces], vertices_list=[tensor_verts])
 
                 if normals.strides[1] < 0:
                     normals = normals[:, ::-1]
@@ -205,9 +165,6 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage="python main.py path_to_experiments")
     
-    #experiment_path = "experiments/double_torus_toy.json"
-    #experiment_path = "experiments/armadillo.json"
-    #experiment_path = "experiments/cube_time_0.json"
     p.add_argument(
         "experiment_path",
         help="Path to the JSON experiment description file"
@@ -229,10 +186,7 @@ if __name__ == "__main__":
         overwrite=False
     )
 
-    space_time = parameter_dict.get("space_time")  # consider the spacetime (x,y,z,t) as domain
-    n_in_features = 3  # implicit 3D models
-    if space_time:
-        n_in_features = 4  # used to animate implicit 3D models
+    n_in_features = 4  # used to animate implicit 3D models
 
     # Saving the parameters to the output path
     with open(os.path.join(full_path, "params.json"), "w+") as fout:
@@ -249,35 +203,47 @@ if __name__ == "__main__":
 
     scaling = parameter_dict.get("scaling")
 
+
+    timelapse = kaolin.visualize.Timelapse(os.path.join(full_path, "kaolin"))
+
+
     dataset = None
     datasets = parameter_dict["dataset"]
     for d in datasets:
         d[0] = os.path.join("data", d[0])
 
-    if len(datasets[0]) == 3:
-        #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
-        pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=60)
-        pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
-        pretrained_ni.eval()
-        pretrained_ni.to(device) 
-        datasets[0] = [datasets[0][0], datasets[0][2]]
+    # if len(datasets[0]) == 3:
+    #     #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+    #     pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
+    #     pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
+    #     pretrained_ni.eval()
+    #     pretrained_ni.to(device) 
+    #     datasets[0] = [datasets[0][0], datasets[0][2]]
 
     # TODO: think in how to consider multiples trained sirens
     # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
-    # pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
-    # pretrained_ni1.eval()
-    # pretrained_ni1.to(device) 
+    pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=30)
+    # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
+    pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_2x128_w0-30.pth'))
+    pretrained_ni1.eval()
+    pretrained_ni1.to(device) 
 
-    # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/armadillo-2x128_w0-30.pth'))
-    # pretrained_ni2.eval()
-    # pretrained_ni2.to(device) 
+    # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
+    #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
+    pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
+    pretrained_ni2.eval()
+    pretrained_ni2.to(device) 
 
     dataset = SpaceTimePointCloudNI(
         datasets,
         sampling_config["samples_on_surface"],
-        #pretrained_ni=[pretrained_ni1],
-        pretrained_ni=[pretrained_ni],
+        pretrained_ni=[pretrained_ni1, pretrained_ni2],
+        #pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
         device=device
@@ -298,6 +264,22 @@ if __name__ == "__main__":
         hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
         w0=parameter_dict["network"]["w0"]
     )
+    
+    #use the weights of a trained i3d net
+    use_trained_weights = False
+    if use_trained_weights:
+
+        #layer_0 = model.net[0][0].weight[...,3].unsqueeze(-1)
+        
+        # i3d_weights = torch.load("shapeNets/dragon_2x256_w-60.pth")
+        i3d_weights = torch.load("shapeNets/bunny_2x256_w-30.pth")
+        first_layer = i3d_weights['net.0.0.weight']
+        new_first_layer = torch.cat((first_layer,torch.zeros_like(first_layer[...,0].unsqueeze(-1))), dim=-1) #initialize with zeros
+        #new_first_layer = torch.cat((first_layer, layer_0), dim=-1) #initialize using siren scheme
+        i3d_weights['net.0.0.weight'] = new_first_layer
+        model.load_state_dict(i3d_weights)
+        model.to(device=device)
+
     if not args.silent:
         print(model)
 
@@ -311,15 +293,9 @@ if __name__ == "__main__":
     loss = parameter_dict.get("loss")
     if loss is not None and loss:
         if loss == "sitzmann":
-            if space_time:
-                loss_fn = sdf_sitzmann_time   
-            else:    
-                loss_fn = sdf_sitzmann
+            loss_fn = sdf_sitzmann_time   
         elif loss == "true_sdf":  
-            if space_time:
-                loss_fn = sdf_time
-            else:    
-                loss_fn = true_sdf_off_surface
+            loss_fn = sdf_time
         elif loss == "sdf_boundary_problem":
             loss_fn = sdf_boundary_problem
         elif loss == "loss_mean_curv":
@@ -360,7 +336,6 @@ if __name__ == "__main__":
         model,
         device,
         config_dict,
-        space_time,
         silent=args.silent
     )
     loss_df = pd.DataFrame.from_dict(losses)
@@ -371,23 +346,3 @@ if __name__ == "__main__":
         model.state_dict(),
         os.path.join(full_path, "models", "model_final.pth")
     )
-
-    # reconstructing the final mesh
-    mesh_file = parameter_dict["reconstruction"]["output_file"] + ".ply"
-    mesh_resolution = parameter_dict["reconstruction"]["resolution"]
-    
-    if space_time:
-        create_mesh(
-            model,
-            os.path.join(full_path, "reconstructions", mesh_file),
-            0,  # time instant for 4d SIREN function
-            N=mesh_resolution,
-            device=device
-        )
-    else: 
-        create_mesh(
-            model,
-            os.path.join(full_path, "reconstructions", mesh_file),
-            N=mesh_resolution,
-            device=device
-        )

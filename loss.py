@@ -644,18 +644,24 @@ class loss_morphing_two_sirens(torch.nn.Module):
 
         target_deformation = sdf_target - sdf
 
-        additional_weight = vector_dot(grad_3d, grad_target)
+        #additional_weight = vector_dot(grad_3d, grad_target)
 
-        return (ft - additional_weight*target_deformation*grad_norm)**2
+        additional_weight = torch.exp(-sdf**2) #gives proority to the zero-level set
+
+        return (ft - scale*additional_weight*target_deformation*(grad_norm**2))**2
         #return (ft - scale*target_deformation*grad_norm)**2
 
     def forward(self, X, gt):
-        gt_sdf = gt["sdf"]
+        #gt_sdf = gt["sdf"]
         
         coords = X["model_in"]
         pred_sdf = X["model_out"]
 
         grad = gradient(pred_sdf, coords)
+
+        # C = 0.1
+        # lipschitz_constraint = (grad.norm(dim=-1) - C).unsqueeze(-1)
+        # lipschitz_constraint = torch.nn.Softplus()(lipschitz_constraint)
 
         # trained model1
         trained_model1 = self.model1(coords[...,0:3])
@@ -669,7 +675,8 @@ class loss_morphing_two_sirens(torch.nn.Module):
         trained_model2_in = trained_model2['model_in']
         grad_trained_model2 = gradient(trained_model2_out, trained_model2_in)
 
-        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, trained_model2_out, grad_trained_model2, scale=10)
+        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, trained_model2_out, grad_trained_model2, scale=1)
+        #morphing_constraint = grad[..., 3].unsqueeze(-1)**2
 
         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
         grad = grad[...,0:3] 
@@ -697,6 +704,7 @@ class loss_morphing_two_sirens(torch.nn.Module):
             #"GPNF_constraint": GPNF_constraint.mean()*1e-1,
             #"grad_constraint": eikonal_constraint(grad).mean() * 1e2,
             "morphing_constraint": morphing_constraint.mean() * 1e3,
+            #"lipschitz_constraint": lipschitz_constraint.mean() * 1e1,
         }    
 
 

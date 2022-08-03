@@ -8,10 +8,10 @@
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["spot.ply", -1],["bob.ply", 1]],
+    "dataset": [["spot.ply", -1],["blub_scaled.ply", 1]],
     "batch_size": 2000,
     "checkpoint_path": "logs",
-    "experiment_name": "spot_bob_1x128_w-20_reg_test",
+    "experiment_name": "spot_blub_1x128_w-20_reg_test",
     "epochs_to_checkpoint": 1000,
     "epochs_to_reconstruction": 1000,
     "loss": "loss_morphing_two_sirens",

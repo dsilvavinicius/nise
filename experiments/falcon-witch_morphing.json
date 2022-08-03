@@ -3,15 +3,15 @@
     "space_time": true,
     "num_epochs": 200001,
     "sampling_opts": {
-        "samples_on_surface": 2000,
-        "samples_off_surface": 2000,
+        "samples_on_surface": 70000,
+        "samples_off_surface": 70000,
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["spot.ply", -1],["bob.ply", 1]],
-    "batch_size": 2000,
+    "dataset": [["falcon.ply", -1],["witch.ply", 1]],
+    "batch_size": 35000,
     "checkpoint_path": "logs",
-    "experiment_name": "spot_bob_1x128_w-20_reg_test",
+    "experiment_name": "falcon_witch_2x128_w-30",
     "epochs_to_checkpoint": 1000,
     "epochs_to_reconstruction": 1000,
     "loss": "loss_morphing_two_sirens",
@@ -24,7 +24,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [128,128],
-        "w0": 20
+        "hidden_layer_nodes": [128,128,128],
+        "w0": 30
     }
 }

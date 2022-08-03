@@ -1,0 +1,30 @@
+{
+    "description": "SIREN Learning of the Armadillo mesh.",
+    "space_time": true,
+    "num_epochs": 52000,
+    "sampling_opts": {
+        "samples_on_surface": 198514,
+        "samples_off_surface": 198514,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "dataset": [["dragon.ply", "shapeNets/dragon_2x256_w-60.pth", -0.6]],
+    "batch_size": 40000,
+    "checkpoint_path": "logs",
+    "experiment_name": "dragon_2x256_w-60_mean_curv",
+    "epochs_to_checkpoint": 100,
+    "epochs_to_reconstruction": 100,
+    "loss": "loss_mean_curv",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-5
+    },
+    "reconstruction": {
+        "resolution": 256,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [256,256,256],
+        "w0": 60
+    }
+}
