@@ -8,7 +8,7 @@
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["falcon.ply", -1],["witch.ply", 1]],
+    "dataset": [["falcon_sub.ply", -1],["witch.ply", 1]],
     "batch_size": 35000,
     "checkpoint_path": "logs",
     "experiment_name": "falcon_witch_2x128_w-30",
