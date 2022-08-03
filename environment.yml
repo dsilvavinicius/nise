@@ -13,3 +13,4 @@ dependencies:
   - pip
   - pip:  
     - mesh-to-sdf
+    - kaolin
