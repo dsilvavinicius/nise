@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import PointCloud, SpaceTimePointCloud
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import sdf_morphing, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem
+from loss import loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -98,22 +98,32 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     running_loss[it] += l.item()
 
             # Adding an iteration of the training data to tensorboard
-            if space_time: 
-                coords_time0 = data["coords"][data["coords"][...,3]==0]
-                colors = torch.zeros_like(coords_time0[...,0:3], device="cpu", requires_grad=False)
-                sdf_time0 = data["sdf"][data["coords"][...,3]==0]
-                inputs = coords_time0[...,0:3].to(device)
-            else:
+            # if space_time:
+                # coords_time0 = data["coords"][data["coords"][..., 3] == 0]
+                # colors = torch.zeros_like(coords_time0[..., 0:3], device="cpu", requires_grad=False)
+                # sdf_time0 = data["sdf"][data["coords"][..., 3] == 0]
+                # inputs = coords_time0[..., 0:3].to(device)
+
+                # #at time zero
+                # colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+                # colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+                # colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+
+                # writer.add_mesh(
+                #     "input", inputs.unsqueeze(-1), colors=colors.unsqueeze(-1), global_step=epoch
+                # )
+            if not space_time:
                 colors = torch.zeros_like(data["coords"], device="cpu", requires_grad=False)
             
-            #at time zero
-            colors[sdf_time0.squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
-            colors[sdf_time0.squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
-            colors[sdf_time0.squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
-            
-            writer.add_mesh(
-                "input", inputs.unsqueeze(0), colors=colors.unsqueeze(0), global_step=epoch
-            )
+                #at time zero
+                colors[data["sdf"].squeeze(-1) < 0, :] = torch.Tensor([255, 0, 0])
+                colors[data["sdf"].squeeze(-1) == 0, :] = torch.Tensor([0, 255, 0])
+                colors[data["sdf"].squeeze(-1)  > 0, :] = torch.Tensor([0, 0, 255])
+
+                writer.add_mesh(
+                    "input", inputs, colors=colors, global_step=epoch
+                )
+
             writer.add_scalar("train_loss", train_loss.item(), epoch)
 
             train_loss.backward()
@@ -152,11 +162,9 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
             mesh_resolution = train_config["mc_resolution"]
             
             if space_time:
-                N = 8    # number of samples of the interval time [0,1]
+                N = 7    # number of samples of the interval time
                 for i in range(N):
-                    T = 0.5*i/(N-1)
-                    #pi = 3.14159265359/4
-                    #T = pi*(i)/(N-1)
+                    T = 0.2*(i/(N-1))
                     mesh_file = f"epoch_{epoch}_time_{T}.ply"
                     verts, _, normals, _ = create_mesh(
                         model,
@@ -173,17 +181,17 @@ def train_model(dataset, model, device, train_config, space_time=False, silent=F
                     device=device
                 )
 
-            if normals.strides[1] < 0:
-                normals = normals[:, ::-1]
-            verts = torch.from_numpy(verts).unsqueeze(0)
-            normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
+                if normals.strides[1] < 0:
+                    normals = normals[:, ::-1]
+                verts = torch.from_numpy(verts).unsqueeze(0)
+                normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
 
-            writer.add_mesh(
-                "reconstructed_point_cloud",
-                vertices=verts,
-                colors=normals,
-                global_step=epoch
-            )
+                writer.add_mesh(
+                    "reconstructed_point_cloud",
+                    vertices=verts,
+                    colors=normals,
+                    global_step=epoch
+                )
 
             model.train()
 
@@ -305,8 +313,18 @@ if __name__ == "__main__":
                 loss_fn = true_sdf_off_surface
         elif loss == "sdf_boundary_problem":
             loss_fn = sdf_boundary_problem
-        elif loss == "sdf_morphing":
-            loss_fn = sdf_morphing
+        elif loss == "loss_mean_curv":
+            loss_fn = loss_mean_curv
+        elif loss == "loss_eikonal":
+            loss_fn = loss_eikonal
+        elif loss == "loss_eikonal_mean_curv":
+            loss_fn = loss_eikonal_mean_curv
+        elif loss == "loss_constant":
+            loss_fn = loss_constant
+        elif loss == "loss_transport":
+            loss_fn = loss_transport
+        elif loss == "loss_vector_field_morph":
+            loss_fn = loss_vector_field_morph
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 

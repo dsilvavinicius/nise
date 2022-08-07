@@ -1,0 +1,32 @@
+{
+    "description": "SIREN Learning the transport of Sphere.",
+    "space_time": true,
+    "num_epochs": 10000,
+    "sampling_opts": {
+        "samples_on_surface": 32000,
+        "samples_off_surface": 32000,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "scaling": "",
+    "dataset": [["sphere.ply", 0]],
+    "off_surface_normals": [-1, -1, -1],
+    "batch_size": 16000,
+    "checkpoint_path": "logs",
+    "experiment_name": "sphere_transport",
+    "epochs_to_checkpoint": 100,
+    "epochs_to_reconstruction": 100,
+    "loss": "loss_transport",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 128,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [128, 128, 128],
+        "w0": 10
+    }
+}

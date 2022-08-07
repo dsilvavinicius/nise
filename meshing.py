@@ -12,7 +12,7 @@ import torch
 def create_mesh(
     decoder,
     filename="",
-    t=-1, #time=-1 means we are only in the space
+    t=-1000, #time=-1000 means we are only in the space
     N=256,
     max_batch=64 ** 3,
     offset=None,
@@ -29,7 +29,7 @@ def create_mesh(
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
     
     sdf_coord = 3
-    if (t!=-1):
+    if (t!=-1000):
         sdf_coord = 4
 
     # (x,y,z,sdf) if we are not considering time
@@ -50,7 +50,7 @@ def create_mesh(
     samples.requires_grad = False
 
     #adding the time
-    if(t!=-1):
+    if(t!=-1000):
         samples[:, sdf_coord-1] = t
 
 

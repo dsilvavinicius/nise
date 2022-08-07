@@ -9,14 +9,14 @@
         "sampler": false
     },
     "scaling": "",
-    "dataset": [["cube.ply", 0], ["sphere.ply", 0.5]],
+    "dataset": [["cube.ply", -1], ["sphere.ply", -0.75],["cube.ply", -0.5], ["sphere.ply", -0.25],["cube.ply", 0], ["sphere.ply", 0.25],["cube.ply", 0.5], ["sphere.ply", 0.75],["cube.ply", 1]],
     "off_surface_normals": [-1, -1, -1],
     "batch_size": 15000,
     "checkpoint_path": "logs",
-    "experiment_name": "cube_sphere_mean_curvature_morph",
-    "epochs_to_checkpoint": 10,
-    "epochs_to_reconstruction": 10,
-    "loss": "sdf_morphing",
+    "experiment_name": "cube_sphere_key_frame",
+    "epochs_to_checkpoint": 100,
+    "epochs_to_reconstruction": 100,
+    "loss": "loss_mean_curv",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4

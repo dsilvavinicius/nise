@@ -165,7 +165,7 @@ class PointCloud(Dataset):
         self.point_cloud = get_surface_point_cloud(
             mesh,
             surface_point_method="scan",
-            bounding_radius=1,
+            # bounding_radius=1,
             calculate_normals=True
         )
 
@@ -333,8 +333,15 @@ class SpaceTimePointCloud(Dataset):
         # SDF query structure for each initial condition.
         self.point_clouds = [None] * len(mesh_paths)
 
+        self.min_time, self.max_time = np.inf, -np.inf
+
         for i, mesh_path in enumerate(mesh_paths):
             path, t = mesh_path
+            if self.min_time > t:
+                self.min_time = t
+            if self.max_time < t:
+                self.max_time = t
+
             if not silent:
                 print(f"Loading mesh \"{path}\" at time {t}.")
             mesh = trimesh.load(path)
@@ -384,7 +391,8 @@ class SpaceTimePointCloud(Dataset):
         if n_points <= 0:
             n_points = self.samples_on_surface
 
-        on_surface_count = n_points // 3
+        # on_surface_count = n_points // 3
+        on_surface_count = n_points // 4
         off_surface_count = on_surface_count
         intermediate_count = n_points - (on_surface_count + off_surface_count)
 
@@ -468,7 +476,8 @@ class SpaceTimePointCloud(Dataset):
 
     def _sample_intermediate_times(self, n_points):
         # Samples for intermediate times.
-        off_spacetime_points = np.random.uniform(-1, 1, size=(n_points, 4))
+        #off_spacetime_points = np.random.uniform(-1, 1, size=(n_points, 4))
+        off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4))
         # warning: time goes from -1 to 1
         samples = torch.cat((
             torch.from_numpy(off_spacetime_points.astype(np.float32)),

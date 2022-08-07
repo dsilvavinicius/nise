@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<html>
+
+<style type="text/css">
+body {
+	font-family: "Titillium Web", "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+	font-weight: 300;
+	font-size: 17px;
+	margin-left: auto;
+	margin-right: auto;
+	width: 980px;
+}
+h1 {
+	font-weight:300;
+	line-height: 1.15em;
+}
+
+h2 {
+	font-size: 1.75em;
+}
+a:link,a:visited {
+	color: #1367a7;
+	text-decoration: none;
+}
+a:hover {
+	color: #208799;
+}
+h1, h2, h3 {
+	text-align: center;
+}
+h1 {
+	font-size: 40px;
+	font-weight: 500;
+}
+h2, h3 {
+	font-weight: 400;
+	margin: 16px 0px 4px 0px;
+}
+.paper-title {
+	padding: 16px 0px 16px 0px;
+}
+section {
+	margin: 32px 0px 32px 0px;
+	text-align: justify;
+	clear: both;
+}
+.col-5 {
+	 width: 20%;
+	 float: left;
+}
+.col-4 {
+	 width: 25%;
+	 float: left;
+}
+.col-3 {
+	 width: 33%;
+	 float: left;
+}
+.col-2 {
+	 width: 50%;
+	 float: left;
+}
+.row, .author-row, .affil-row {
+	 overflow: auto;
+}
+.author-row, .affil-row {
+	font-size: 20px;
+}
+.row {
+	margin: 16px 0px 16px 0px;
+}
+.authors {
+	font-size: 18px;
+}
+.affil-row {
+	margin-top: 16px;
+}
+.teaser {
+	max-width: 100%;
+}
+.text-center {
+	text-align: center;
+}
+.screenshot {
+	width: 256px;
+	border: 1px solid #ddd;
+}
+.screenshot-lg {
+	width: 512px;
+	border: 1px solid #ddd;
+	display: block;
+  	margin-left: auto;
+  	margin-right: auto;
+}
+.screenshot-elg {
+	width: 100%;
+	border: 1px solid #ddd;
+	display: block;
+  	margin-left: auto;
+  	margin-right: auto;
+}
+.screenshot-el {
+	margin-bottom: 16px;
+}
+hr {
+	height: 1px;
+	border: 0;
+	border-top: 1px solid #ddd;
+	margin: 0;
+}
+.material-icons {
+	vertical-align: -6px;
+}
+p {
+	line-height: 1.25em;
+}
+.caption_justify {
+	font-size: 16px;
+	/*font-style: italic;*/
+	color: #666;
+	text-align: justify;
+	margin-top: 0px;
+	margin-bottom: 64px;
+}
+.caption {
+	font-size: 16px;
+	/*font-style: italic;*/
+	color: #666;
+	text-align: center;
+	margin-top: 8px;
+	margin-bottom: 64px;
+}
+.caption_inline {
+	font-size: 16px;
+	/*font-style: italic;*/
+	color: #666;
+	text-align: center;
+	margin-top: 8px;
+	margin-bottom: 0px;
+}
+.caption_bold {
+	font-size: 16px;
+	/*font-style: italic;*/
+	color: #666;
+	text-align: center;
+	margin-top: 0px;
+	margin-bottom: 0px;
+	font-weight: bold;
+}
+video {
+	display: block;
+	margin: auto;
+}
+figure {
+	display: block;
+	margin: auto;
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+figure {
+	display: block;
+	margin: auto;
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+#bibtex pre {
+	font-size: 14px;
+	background-color: #eee;
+	padding: 16px;
+}
+.blue {
+	color: #2c82c9;
+	font-weight: bold;
+}
+.orange {
+	color: #d35400;
+	font-weight: bold;
+}
+.flex-row {
+	display: flex;
+	flex-flow: row wrap;
+	justify-content: space-around;
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+.paper-btn {
+  position: relative;
+  text-align: center;
+
+  display: inline-block;
+  margin: 8px;
+  padding: 8px 8px;
+
+  border-width: 0;
+  outline: none;
+  border-radius: 2px;
+
+  background-color: #1367a7;
+  color: #ecf0f1 !important;
+  font-size: 20px;
+  width: 100px;
+  font-weight: 600;
+}
+.paper-btn-parent {
+	display: flex;
+	justify-content: center;
+	margin: 16px 0px;
+}
+.paper-btn:hover {
+	opacity: 0.85;
+}
+.container {
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: 16px;
+	padding-right: 16px;
+}
+.venue {
+	color: #1367a7;
+}
+</style>
+<link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,600,400italic,600italic,300,300italic' rel='stylesheet' type='text/css'>
+<head>
+	<title>Neural Implicit Surfaces in Higher Dimension</title>
+	<meta property="og:description" content="Neural Implicit Surfaces in Higher Dimension"/>
+	<meta property="og:image" itemprop="image" content="https://dsilvavinicius.github.io/neural_implicit_surfaces_in_higher_dimension/assets/representative.jpg">
+	<link href="https://fonts.googleapis.com/css2?family=Material+Icons" rel="stylesheet">
+
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:creator" content="@dsilvavinicius">
+	<meta name="twitter:title" content="Neural Implicit Surfaces in Higher Dimension">
+	<meta name="twitter:description" content="A new paper which uses differential equations to introduce a time dimension for Neural Implicits, allowing animation.">
+	<meta name="twitter:image" content="https://dsilvavinicius.github.io/neural_implicit_surfaces_in_higher_dimension/assets/representative.jpg">
+</head>
+
+<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+
+<body>
+<div class="container">
+	<div class="paper-title">
+		<h1>Neural Implicit Surfaces in Higher Dimension</h1>
+	</div>
+
+	<div id="authors">
+        <div class="author-row">
+            <div class="col-3 text-center"><a href="https://sites.google.com/site/tiagonovellodebrito">Tiago Novello</a><sup>1*</sup></div>
+			<div class="col-3 text-center"><a href="https://schardong.github.io">Guilherme Schardong</a><sup>2*</sup></div>
+			<div class="col-3 text-center"><a href="http://www.inf.puc-rio.br/~lopes">Hélio Lopes</a><sup>2*</sup></div>
+		</div>
+		<div class="author-row">
+			<div class="col-3 text-center"><a href="https://dsilvavinicius.github.io">Vinícius da Silva</a><sup>2*</sup></div>
+			<div class="col-3 text-center"><a href="https://www.lschirmer.com/">Luiz Schirmer</a><sup>3*</sup></div>
+			<div class="col-3 text-center"><a href="https://lvelho.impa.br">Luiz Velho</a><sup>1*</sup></div>
+		</div>
+
+        <div class="affil-row">
+			<div class="col-3 text-center"><sup>1</sup>IMPA</div>
+            <div class="col-3 text-center"><sup>2</sup>PUC-Rio</div>
+            <div class="col-3 text-center"><sup>3</sup>University of Coimbra</div>
+        </div>
+
+		<div style="clear: both">
+			<div class="paper-btn-parent">
+				<a class="paper-btn" href="assets/novello2022neural.pdf">
+					<span class="material-icons"> description </span>
+					Paper
+				</a>
+				<a class="paper-btn" href="https://youtu.be/Vdf4AYRdYrY">
+					<span class="material-icons"> videocam </span>
+					Video
+				</a>
+				<!--<a class="paper-btn" href="https://github.com/dsilvavinicius/mip-plicits">
+					<span class="material-icons"> code </span>
+					Code
+				</a>-->
+			</div>
+		</div>
+	</div>
+
+	<section id="teaser-videos">
+		<!--
+		<figure style="width: 33%; float: left">
+			<p class="caption_bold">
+				Coarse
+			</p>
+		</figure>
+
+		<figure style="width: 33%; float: left">
+			<p class="caption_bold">
+				Neural Implicit Normal Mapping
+			</p>
+		</figure>
+
+		<figure style="width: 33%; float: left">
+			<p class="caption_bold">
+				Baseline
+			</p>
+		</figure>
+		-->
+
+		<figure style="width: 100%; float: left">
+			<video class="centered" width="100%" autoplay muted loop playsinline>
+				<source src="assets/teaser.mp4" type="video/mp4">
+				Your browser does not support the video tag.
+			</video>
+		</figure>
+
+		<figure style="width: 100%; float: left">
+			<p class="caption_justify">
+				4D (3D plus time) <b>Neural Implicits</b> are animated. This is achieved by using differential equations terms in the loss functions, which is possible because of the smooth activation functions used in the model.
+			</p>
+		</figure>
+	</section>
+
+	<section id="news">
+		<h2>News</h2>
+		<hr>
+		<div class="row">
+			<div><span class="material-icons"> description </span> [Jan 27th 2022] Page online.</div>
+		</div>
+	</section>
+	
+	<section id="abstract"/>
+		<h2>Abstract</h2>
+		<hr>
+		<p>
+			This work investigates the use of neural networks admitting high-order derivatives for modeling dynamic variations of smooth implicit surfaces. For this purpose, it extends the representation of differentiable neural implicit surfaces to higher dimensions, which opens up mechanisms that allow to exploit geometric transformations in many settings, from animation and surface evolution to shape morphing and design galleries.<br> 
+            
+            The problem is modeled by a \(k-\)<b><i>parameter family</i></b> of surfaces \(S_c\), specified as a neural network function \(f : R^3 \times R^k \rightarrow R\), where \(S_c\) is the zero-level set of the implicit function \(f(\cdot, c) : R^3 \rightarrow R \), with \(c \in R^k\), with variations induced by the control variable \(c\).
+            
+            In that context, restricted to each coordinate of \(R^k\), the underlying representation is a neural homotopy  which is the solution of a general <b><i>partial differential equation</i></b> (PDE).
+		</p>
+	</section>
+
+	<section id="overview"/>
+		<h2>Overview</h2>
+		<hr>
+		<p>	
+		Let \(S\) be a surface in \(R^3\), and \(g:R^3\rightarrow R\) be an unknown neural implicit function. To compute the parameter set of \(g\) such that \(g^{-1}(0)\) approximates \(S\), it is common to consider the <b><i>Eikonal</i></b> problem.<br> 
+
+		We augment the domain \(R^3\) by a product space \(R^3\times R^k\), where \(p\in R^3\) denotes a point in the space and \(c\in R^k\) denotes a vector that control \(k\) directions of possible animations of the initial implicit surface. 
+		In this work we focus on the <b><i>space-time</i></b> \(R^3\times R\). <br>
+
+		Specifically, let \(f:R^3\times R \rightarrow R\) be a smooth neural function representing an <b><i>one-parameter</i></b> family of neural implicit functions \(f_t:R^3\rightarrow R\) defined by \(f_t(p)=f(p,t)\). Topologically, the family \(f_t\) represents <b><i>homotopies</i></b> between any two functions \(f_{t_0},\,f_{t_1}:R^3\rightarrow R\), with \(t_0, t_1\in R\). Thus, we say that \(f\) is a <b><i>neural homotopy function</i></b>.
+		The underlying family of neural implicit surfaces \(S_t = f_t^{-1} (0)\) is a <b><i>neural animation</i></b> of the initial surface \(S_0=S\). Restricted to the interval \([t_0,t_1]\), the surfaces \(S_t\) represent a <b><i>neural morphing</i></b> between the neural implicit surfaces \(S_{t_0}\) and \(S_{t_1}\).<br>
+
+		In the same way that we considered a neural implicit function as a solution of the Eikonal problem, we can consider the neural homotopy \(f: R^3\times R\rightarrow R\) to be a solution of a general PDE problem \(\mathcal{F}\big(\nabla^n f, \dots, \nabla^1 f, f, p, t\big)=0\). <b><i>Initial-boundary conditions</i></b> can also be used. In this work, we consider several definitions of \(\mathcal{F}\) to model problems such as animation, smoothing, morphing, keyframe interpolation, etc. 
+
+		The time \(t\) allows a continuous navigation in the neural animation \(S_t=f_t^{-1}(0)\). 
+		</p>
+	</section>
+
+	<section id="results">
+		<h2>Results</h2>
+		<hr>
+
+		<div>
+			<div class="col-2 text-center">
+				<h3>Dumbbell</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/dumbbell.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+
+			<div class="col-2 text-center">
+				<h3>Morphing the Sphere into the Armadillo</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/sphere_armadillo.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+		</div>
+
+		<div>
+			<div class="col-2 text-center">
+				<h3>Morphing the Armadillo into the Woman</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/armadillo_woman.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+
+			<div class="col-2 text-center">
+				<h3>Morphing the Armadillo into the Happy Buddha</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/armadillo_buddha.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+		</div>
+	</section>
+
+	<section id="paper">
+		<h2>Paper</h2>
+		<hr>
+		<div class="flex-row">
+			<div style="box-sizing: border-box; padding: 16px; margin: auto;">
+				<a href="assets/novello2022neural.pdf"><img class="screenshot" src="assets/paper-thumbnail.png"></a>
+			</div>
+			<div style="width: 60%">
+				<p><b>Neural Implicit Surfaces in Higher Dimension</b></p>
+				<p>Tiago Novello, Vinícius da Silva, Guilherme Schardong, Luiz Schirmer, Hélio Lopes and Luiz Velho</p>
+
+				<div><span class="material-icons"> description </span><a href="assets/novello2022neural.pdf"> Paper preprint (PDF, 6.0 MB)</a></div>
+				<div><span class="material-icons"> description </span><a href="https://arxiv.org/abs/2201.09636"> arXiv version</a></div>
+				<div><span class="material-icons"> insert_comment </span><a href="assets/novello2022neural.bib"> BibTeX</a></div>
+				<div><span class="material-icons"> videocam </span><a href="https://youtu.be/Vdf4AYRdYrY"> Video</a></div>
+
+				<p>Please send feedback and questions to <a href="https://sites.google.com/site/tiagonovellodebrito">Tiago Novello</a>.</p>
+			</div>
+		</div>
+	</section>
+
+	<section id="bibtex">
+		<h2>Citation</h2>
+		<hr>
+		<pre><code>@article{novello2022neural,
+	title = {Neural Implicit Surfaces in Higher Dimension},
+	author = {Novello, Tiago and da Silva, Vin\'icius and Schardong, Guilherme and Schirmer,
+		Luiz and Lopes, H\'elio and Velho, Luiz},
+	journal = {arXiv:2201.09636},
+	year = {2022},
+	month = jan
+}
+
+</code></pre>
+	</section>
+
+	<section id="acknowledgements">
+		<h2>Acknowledgements</h2>
+		<hr>
+		<div class="row">
+			<p>
+			We would like to thank
+			<a href="https://tovacinni.github.io">Towaki Takikawa</a>,
+            <a href="https://joeylitalien.github.io">Joey Litalien</a>,
+            <a href="https://kangxue.org/">Kangxue Yin</a>,
+            <a href="https://scholar.google.de/citations?user=rFd-DiAAAAAJ">Karsten Kreis</a>,
+            <a href="https://research.nvidia.com/person/charles-loop">Charles Loop</a>,
+            <a href="http://www.cim.mcgill.ca/~derek/">Derek Nowrouzezahrai</a>,
+            <a href="https://www.cs.toronto.edu/~jacobson/">Alec Jacobson</a>,
+            <a href="https://casual-effects.com/">Morgan McGuire</a> and
+            <a href="https://www.cs.toronto.edu/~fidler/">Sanja Fidler</a>
+			for licensing the code of the paper <a href="https://nv-tlabs.github.io/nglod/">Neural Geometric Level of Detail:
+				Real-time Rendering with Implicit 3D Surfaces</a> and project page under the <a href=https://opensource.org/licenses/MIT>MIT License</a>. This website is based on that page.
+			<br/>
+			<br/>
+			<em>We also thank the <a href="https://graphics.stanford.edu">Stanford Computer Graphics Laboratory</a> for the Bunny, Dragon, Armadillo, and Happy Buddha, acquired through the <a href="http://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D scan repository</a>.
+			</p>
+		</div>
+	</section>
+</div>
+</body>
+
+</html>
