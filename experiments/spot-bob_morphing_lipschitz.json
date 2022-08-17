@@ -1,17 +1,17 @@
 {
     "description": "SIREN Learning of the Armadillo mesh.",
     "space_time": true,
-    "num_epochs": 200001,
+    "num_epochs": 100001,
     "sampling_opts": {
-        "samples_on_surface": 70000,
-        "samples_off_surface": 70000,
+        "samples_on_surface": 2000,
+        "samples_off_surface": 2000,
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["falcon_sub.ply", -0.2],["witch.ply", 0.2]],
-    "batch_size": 40000,
+    "dataset": [["spot.ply", -0.1],["bob.ply", 0.1]],
+    "batch_size": 2000,
     "checkpoint_path": "logs",
-    "experiment_name": "falcon_smooth_witch_2x128_w-30_new_loss",
+    "experiment_name": "spot_bob_tanh_4x256_lipchitz_t_-0.1_0.1",
     "epochs_to_checkpoint": 500,
     "epochs_to_reconstruction": 500,
     "loss": "loss_morphing_two_sirens",
@@ -20,11 +20,11 @@
         "lr": 1e-4
     },
     "reconstruction": {
-        "resolution":256,
+        "resolution": 128,
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [128,128,128],
-        "w0": 30
+        "hidden_layer_nodes": [256,256,256,256,256],
+        "w0": 20
     }
 }

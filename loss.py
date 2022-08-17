@@ -627,41 +627,61 @@ class loss_level_set(torch.nn.Module):
             "level_set_constraint": level_set_constraint.mean()*5e3,
         }
 
-# Equation 1 of "Geometric processing with neural fields"
+
 class loss_morphing_two_sirens(torch.nn.Module):
     def __init__(self, trained_model1, trained_model2):
         super().__init__()
-        # Define the model.
+        # Define the models
         self.model1 = trained_model1
         self.model2 = trained_model2
         self.model1.cuda()
         self.model2.cuda()
 
-    def morphing_to_NI(self, grad, sdf, sdf_target, grad_target, scale=1):
+    def morphing_to_NI(self, grad, sdf, coords, sdf_target, grad_target, scale=1):
         ft = grad[...,3].unsqueeze(-1)
         grad_3d = grad[...,0:3]
         grad_norm = torch.norm(grad_3d, dim=-1).unsqueeze(-1)
+
+        unit_grad = grad/grad_norm
+        div = divergence(unit_grad, coords)
+
 
         target_deformation = sdf_target - sdf
 
         #additional_weight = vector_dot(grad_3d, grad_target)
 
-        additional_weight = torch.exp(-sdf**2) #gives proority to the zero-level set
+        target_deformation *= torch.exp(-sdf**2) #gives priority to the zero-level set
 
-        return (ft - scale*additional_weight*target_deformation*(grad_norm**2))**2
-        #return (ft - scale*target_deformation*grad_norm)**2
+        #deformation = - scale*target_deformation - 0.0005*div
+        deformation = - scale*target_deformation 
 
-    def forward(self, X, gt):
-        #gt_sdf = gt["sdf"]
+        return (ft + deformation*grad_norm)**2
+
+
+    def level_set_equation(self, grad, sdf, coords, sdf_target, grad_source, grad_target, scale=1):
+        ft = grad[:,:,3].unsqueeze(-1)
+
+        target_deformation = sdf_target - sdf
+
+        #additional_weight = vector_dot(grad_3d, grad_target)
+
+        target_deformation *= torch.exp(-sdf**2) #gives priority to the zero-level set
+
+        deformation = - scale*target_deformation
+
+        grad_norm = torch.norm(grad_source, dim=-1).unsqueeze(-1)
+        V =deformation*grad_source/grad_norm
+
+        dot = vector_dot(grad[...,0:3], V)
         
+        return (ft + dot)**2
+
+
+    def loss_i4d_interpolation(self, X, gt):
         coords = X["model_in"]
         pred_sdf = X["model_out"]
 
         grad = gradient(pred_sdf, coords)
-
-        # C = 0.1
-        # lipschitz_constraint = (grad.norm(dim=-1) - C).unsqueeze(-1)
-        # lipschitz_constraint = torch.nn.Softplus()(lipschitz_constraint)
 
         # trained model1
         trained_model1 = self.model1(coords[...,0:3])
@@ -675,37 +695,60 @@ class loss_morphing_two_sirens(torch.nn.Module):
         trained_model2_in = trained_model2['model_in']
         grad_trained_model2 = gradient(trained_model2_out, trained_model2_in)
 
-        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, trained_model2_out, grad_trained_model2, scale=1)
-        #morphing_constraint = grad[..., 3].unsqueeze(-1)**2
-
+        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, coords, trained_model2_out, grad_trained_model2, scale=0.1)
+        #morphing_constraint = self.level_set_equation(grad, pred_sdf, coords, trained_model2_out, grad_trained_model1, grad_trained_model2, scale=2)
+        
         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
         grad = grad[...,0:3] 
 
+        time = coords[...,3].unsqueeze(-1)
+
         # Initial-boundary constraints of the Eikonal equation at t=0
-        sdf_constraint = torch.where( coords[...,3].unsqueeze(-1)==-1, (trained_model1_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-        sdf_constraint = torch.where( coords[...,3].unsqueeze(-1)==1, (trained_model2_out - pred_sdf) ** 2, sdf_constraint)
+        sdf_constraint = torch.where( time ==-0.1, (trained_model1_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
+        sdf_constraint = torch.where( time == 0.1, (trained_model2_out - pred_sdf) ** 2, sdf_constraint)
 
         normal_constraint = torch.where(
-            coords[...,3].unsqueeze(-1)==-1,
+            time ==-0.1,
             1 - F.cosine_similarity(grad, grad_trained_model1, dim=-1)[..., None],
             torch.zeros_like(grad[..., :1])
         )
 
         normal_constraint = torch.where(
-            coords[...,3].unsqueeze(-1)==1, 
+            time ==0.1, 
             1 - F.cosine_similarity(grad, grad_trained_model2, dim=-1)[..., None], 
             normal_constraint
         )
 
         return {
             "sdf_constraint": sdf_constraint.mean() * 1e4,
-            #"sdf_off_constraint": sdf_off_constraint.mean() * 1e4,
-            "normal_constraint": normal_constraint.mean() * 1e2,
-            #"GPNF_constraint": GPNF_constraint.mean()*1e-1,
-            #"grad_constraint": eikonal_constraint(grad).mean() * 1e2,
+            "normal_constraint": normal_constraint.mean() * 1e1,#1e2,
             "morphing_constraint": morphing_constraint.mean() * 1e3,
-            #"lipschitz_constraint": lipschitz_constraint.mean() * 1e1,
-        }    
+        }   
+    
+    def loss_lipschitz_interpolation(self, X, gt):
+        coords = X["model_in"]
+        pred_sdf = X["model_out"]
+
+        # trained model1
+        trained_model1 = self.model1(coords[...,0:3])
+        trained_model1_out = trained_model1['model_out'].detach()
+       
+        # trained model2
+        trained_model2 = self.model2(coords[...,0:3])
+        trained_model2_out = trained_model2['model_out'].detach()
+
+        # Initial-boundary constraints of the Eikonal equation at t=0
+        sdf_constraint = torch.where( coords[...,3].unsqueeze(-1)==-0.1, (trained_model1_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
+        sdf_constraint = torch.where( coords[...,3].unsqueeze(-1)== 0.1, (trained_model2_out - pred_sdf) ** 2, sdf_constraint)
+
+        return {
+            "sdf_constraint": sdf_constraint.mean()*1e2,
+        }   
+
+
+    def forward(self, X, gt):
+        #return self.loss_i4d_interpolation(X, gt)
+        return self.loss_lipschitz_interpolation(X, gt)
 
 
 

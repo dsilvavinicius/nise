@@ -53,6 +53,7 @@ def create_mesh(
     if(t!=-1000):
         samples[:, sdf_coord-1] = t
 
+    # samples[:, 0:sdf_coord-1]*=100 #for lipschitz reconstruction
 
     num_samples = N ** 3
     head = 0
@@ -85,16 +86,106 @@ def create_mesh(
         scale,
     )
 
-    if filename:
-        if not silent:
-            print(f"Saving mesh to {filename}")
+    # if filename:
+    #     if not silent:
+    #         print(f"Saving mesh to {filename}")
 
-        save_ply(verts, faces, filename)
+    #     save_ply(verts, faces, filename)
 
-        if not silent:
-            print("Done")
+    #     if not silent:
+    #         print("Done")
 
     return verts, faces, normals, values
+
+
+def create_mesh_lipschitz(
+    decoder,
+    filename="",
+    t=-1000, #time=-1000 means we are only in the space
+    N=256,
+    max_batch=64 ** 3,
+    offset=None,
+    scale=None,
+    device="cpu",
+    silent=False
+):
+    decoder.eval()
+
+    # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
+    voxel_origin =[-1, -1, -1]
+    voxel_size = 2.0 / (N - 1)
+
+    overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
+    
+    sdf_coord = 3
+    if (t!=-1000):
+        sdf_coord = 4
+
+    # (x,y,z,sdf) if we are not considering time
+    # (x,y,z,t,sdf) otherwise
+    samples = torch.zeros(N ** 3, sdf_coord + 1, device=device)
+
+    # transform first 3 columns
+    # to be the x, y, z index
+    samples[:, 2] = overall_index % N
+    samples[:, 1] = (overall_index.long() / N) % N
+    samples[:, 0] = ((overall_index.long() / N) / N) % N
+
+    # transform first 3 columns
+    # to be the x, y, z coordinate
+    samples[:, 0] = (samples[:, 0] * voxel_size) + voxel_origin[2]
+    samples[:, 1] = (samples[:, 1] * voxel_size) + voxel_origin[1]
+    samples[:, 2] = (samples[:, 2] * voxel_size) + voxel_origin[0]
+    samples.requires_grad = False
+
+    #adding the time
+    if(t!=-1000):
+        samples[:, sdf_coord-1] = t
+
+    # samples[:, 0:3]*=10 #for lipschitz reconstruction
+
+    num_samples = N ** 3
+    head = 0
+
+    start = time.time()
+    while head < num_samples:
+        #print(head)
+        sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
+
+        samples[head:min(head + max_batch, num_samples), sdf_coord] = (
+            decoder(sample_subset)["model_out"]
+            .squeeze()
+            .detach()
+            .cpu()
+        )
+        head += max_batch
+
+    sdf_values = samples[:, sdf_coord]
+    sdf_values = sdf_values.reshape(N, N, N)
+
+    end = time.time()
+    if not silent:
+        print(f"Sampling took: {end-start} s")
+
+    verts, faces, normals, values = convert_sdf_samples_to_ply(
+        sdf_values.data.cpu(),
+        voxel_origin,
+        voxel_size,
+        offset,
+        scale,
+    )
+
+    # if filename:
+    #     if not silent:
+    #         print(f"Saving mesh to {filename}")
+
+    #     save_ply(verts, faces, filename)
+
+    #     if not silent:
+    #         print("Done")
+
+    return verts, faces, normals, values
+
 
 
 def convert_sdf_samples_to_ply(
