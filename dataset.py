@@ -588,10 +588,15 @@ class SpaceTimePointCloudNI(Dataset):
     def _sample_intermediate_times(self, n_points):
         # Samples for intermediate times.
         #off_spacetime_points = np.random.uniform(-0.6, 0.6, size=(n_points, 4))
-        off_spacetime_points = np.random.uniform(self.min_time, self.max_time, size=(n_points, 4))
+        
+        off_spacetime_coords = np.random.uniform(-1, 1, size=(n_points, 3))
+        # off_spacetime_time = np.random.uniform(self.min_time, self.max_time, size=(n_points, 1))
+        off_spacetime_time = np.random.uniform(0.0, 0.5, size=(n_points, 1))
+
         # warning: time goes from -1 to 1
         samples = torch.cat((
-            torch.from_numpy(off_spacetime_points.astype(np.float32)),
+            torch.from_numpy(off_spacetime_coords.astype(np.float32)),
+            torch.from_numpy(off_spacetime_time.astype(np.float32)),
             torch.full(size=(n_points, 3), fill_value=-1, dtype=torch.float32),
             torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32),
         ), dim=1)
