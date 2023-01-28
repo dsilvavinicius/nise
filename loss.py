@@ -437,23 +437,6 @@ def loss_transport(X, gt):
     }
 
 def loss_mean_curv(X, gt):
-    """Loss function used to solve the mean curvature flow.
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-    """
     gt_sdf = gt["sdf"]
     gt_normals = gt["normals"]
     
@@ -464,6 +447,7 @@ def loss_mean_curv(X, gt):
 
     # PDE constraints
     mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
+    # mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.025) #for dumbbell
     
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
     grad = grad[...,0:3] 
@@ -481,14 +465,39 @@ def loss_mean_curv(X, gt):
            torch.zeros_like(grad[..., :1])
     )
 
+    return {
+        "sdf_constraint": sdf_constraint.mean() * 1e3,
+        "normal_constraint": normal_constraint.mean() * 1e1,
+        "mean_curvature_constraint": mean_curvature_constraint.mean()*1e3,
+    }
+
+
+def loss_mean_curv_with_restrictions(X, gt):
+    gt_sdf = gt["sdf"]
+    gt_normals = gt["normals"]
+    
+    coords = X["model_in"]
+    pred_sdf = X["model_out"]
+
+    grad = gradient(pred_sdf, coords)
+
+    # PDE constraints
+    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
+    mean_curvature_constraint = torch.where( coords[..., 0].unsqueeze(-1)<0, grad[...,3].unsqueeze(-1)**2, mean_curvature_constraint)
+
+    #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+    grad = grad[...,0:3] 
+    
+    sdf_constraint = torch.where( gt_sdf!=-1, (gt_sdf - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
+    normal_constraint = torch.where(
+           gt_sdf!=-1,
+           1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+           torch.zeros_like(grad[..., :1])
+    )
 
     return {
-        #"sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 1e4,
-        #"sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e2,
         "sdf_constraint": sdf_constraint.mean() * 1e3,
-        #"normal_on_surface_constraint": normal_on_surface_constraint.mean() * 5e1,
         "normal_constraint": normal_constraint.mean() * 1e1,
-        #"grad_constraint": grad_constraint.mean() * 1e2,
         "mean_curvature_constraint": mean_curvature_constraint.mean()*1e3,
     }
 
@@ -586,6 +595,17 @@ class loss_level_set(torch.nn.Module):
 
         return V
 
+    def armadillo_fat_vector_field(self,x):
+        # center1 = [-0.4, 0.2, 0.0]
+        # spreads1 = [0.2,0.2,0.2]
+        center1 = [0.0, 0.1, 0.05]
+        spreads1 = [0.3,0.3,0.3]
+
+        # V = self.source_vector_field(x, center1, spreads1)
+        V = self.source_vector_field(x, center1, spreads1)
+
+        return V
+
     def twist_vector_field(self,x):
         X = x[...,0].unsqueeze(-1)
         Y = x[...,1].unsqueeze(-1)+1
@@ -611,7 +631,9 @@ class loss_level_set(torch.nn.Module):
     def level_set_equation(self, grad, x):
         ft = grad[:,:,3].unsqueeze(-1)
         #V = self.twist_X_vector_field(x)
-        V = self.twist_vector_field(x)
+        # V = self.twist_vector_field(x)
+        V = self.armadillo_fat_vector_field(x)
+        
         #V = self.vector_field(x)
         dot = vector_dot(grad[...,0:3], V)
         
@@ -652,7 +674,7 @@ class loss_level_set(torch.nn.Module):
         )
 
         return {
-            "sdf_constraint": sdf_constraint.mean()*1e3,
+            "sdf_constraint": sdf_constraint.mean()*1e4,#1e3,
             "normal_constraint": normal_constraint.mean()*1e1,
            # "grad_constraint": grad_constraint.mean(),
             "level_set_constraint": level_set_constraint.mean()*5e3,
@@ -743,7 +765,7 @@ class loss_morphing_two_sirens(torch.nn.Module):
         trained_model2_in = trained_model2['model_in']
         grad_trained_model2 = gradient(trained_model2_out, trained_model2_in)
 
-        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, coords, trained_model2_out, grad_trained_model2, scale=2)
+        morphing_constraint = self.morphing_to_NI(grad, pred_sdf, coords, trained_model2_out, grad_trained_model2, scale=0.5)
         #morphing_constraint = self.level_set_equation(grad, pred_sdf, coords, trained_model2_out, grad_trained_model1, grad_trained_model2, scale=10)
         
         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
@@ -751,26 +773,31 @@ class loss_morphing_two_sirens(torch.nn.Module):
 
         time = coords[...,3].unsqueeze(-1)
 
+        time_init=-0.2
+        time_final=0.2
+        
+
         # Initial-boundary constraints of the Eikonal equation at t=0
-        sdf_constraint = torch.where( time ==-0.1, (trained_model1_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-        sdf_constraint = torch.where( time == 0.1, (trained_model2_out - pred_sdf) ** 2, sdf_constraint)
+        sdf_constraint = torch.where( time ==time_init, (trained_model1_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
+        sdf_constraint = torch.where( time == time_final, (trained_model2_out - pred_sdf) ** 2, sdf_constraint)
 
         normal_constraint = torch.where(
-            time ==-0.1,
+            time ==time_init,
             1 - F.cosine_similarity(grad, grad_trained_model1, dim=-1)[..., None],
             torch.zeros_like(grad[..., :1])
         )
 
         normal_constraint = torch.where(
-            time ==0.1, 
+            time ==time_final, 
             (1 - F.cosine_similarity(grad, grad_trained_model2, dim=-1)[..., None]), 
             normal_constraint
         )
 
         return {
-            "sdf_constraint": sdf_constraint.mean() * 1e4,
-            "normal_constraint": normal_constraint.mean() * 1e1,#1e2,
-            "morphing_constraint": morphing_constraint.mean() * 1e3,
+            "sdf_constraint": sdf_constraint.mean() * 1e4, 
+            "normal_constraint": normal_constraint.mean() * 1e1,
+            # "morphing_constraint": morphing_constraint.mean() * 1e3,
+            "morphing_constraint": morphing_constraint.mean() * 1e1, #for mipplicits
         }   
     
     def loss_lipschitz_interpolation(self, X, gt):

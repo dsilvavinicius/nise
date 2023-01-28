@@ -12,8 +12,8 @@
     "batch_size": 2000,
     "checkpoint_path": "logs",
     "experiment_name": "spot_bob_tanh_4x256_lipchitz_t_-0.1_0.1",
-    "epochs_to_checkpoint": 500,
-    "epochs_to_reconstruction": 500,
+    "epochs_to_checkpoint": 10000,
+    "epochs_to_reconstruction": 10000,
     "loss": "loss_morphing_two_sirens",
     "optimizer": {
         "type": "adam",

@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import   SpaceTimePointCloud, SpaceTimePointCloudNI
 from model import SIREN
 from samplers import SitzmannSampler
-from loss import loss_level_set, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
+from loss import loss_level_set, loss_mean_curv_with_restrictions, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
 from meshing import create_mesh
 from util import create_output_paths, load_experiment_parameters
 
@@ -126,9 +126,11 @@ def train_model(dataset, model, device, train_config, silent=False):
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
             
-            N = 7    # number of samples of the interval time
+            N = 6    # number of samples of the interval time
+            #T= -0.1#-0.75
             for i in range(N):
-                T = (-1 + 2*(i/(N-1)))*0.2 
+                T = (-1 + 2*(i/(N-1)))*0.2
+                #T = (-1 + 2*(i/(N-1)))
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, faces, normals, _ = create_mesh(
                     model,
@@ -137,23 +139,12 @@ def train_model(dataset, model, device, train_config, silent=False):
                     N=mesh_resolution,
                     device=device
                 )
+                #T += 0.1
 
                 #adding checkpoint to kaolin
                 tensor_faces = torch.from_numpy(faces.copy())
                 tensor_verts = torch.from_numpy(verts.copy())
                 timelapse.add_mesh_batch(category=f"output_{i}", iteration=epoch/EPOCHS_TIL_RECONSTRUCTION, faces_list=[tensor_faces], vertices_list=[tensor_verts])
-
-                # if normals.strides[1] < 0:
-                #     normals = normals[:, ::-1]
-                # verts = torch.from_numpy(verts).unsqueeze(0)
-                # normals = torch.from_numpy(np.abs(normals)*255).unsqueeze(0)
-
-                # writer.add_mesh(
-                #     "reconstructed_point_cloud",
-                #     vertices=verts,
-                #     colors=normals,
-                #     global_step=epoch
-                # )
 
             model.train()
 
@@ -214,7 +205,11 @@ if __name__ == "__main__":
 
     # if len(datasets[0]) == 3:
     #     #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+    #     # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
+    #     # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
+    #     # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
     #     pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
+    #     # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
     #     pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
     #     pretrained_ni.eval()
     #     pretrained_ni.to(device) 
@@ -222,22 +217,26 @@ if __name__ == "__main__":
 
     # TODO: think in how to consider multiples trained sirens
     # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
-    pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=30)
+    pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=20)
+    #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
+    #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    #pretrained_ni1.load_state_dict(torch.load('shapeNets/torus_1x64_w0-16.pth'))
     # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
-    pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_2x128_w0-30.pth'))
-    #pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
+    pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
     pretrained_ni1.eval()
     pretrained_ni1.to(device) 
 
-    # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
     #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    
+    # pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
+    #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
     pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
     pretrained_ni2.eval()
     pretrained_ni2.to(device)
 
@@ -245,7 +244,7 @@ if __name__ == "__main__":
         datasets,
         sampling_config["samples_on_surface"],
         pretrained_ni=[pretrained_ni1, pretrained_ni2],
-        #pretrained_ni=[pretrained_ni],
+        # pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
         device=device
@@ -266,9 +265,10 @@ if __name__ == "__main__":
         hidden_layer_config=parameter_dict["network"]["hidden_layer_nodes"],
         w0=parameter_dict["network"]["w0"]
     )
-    use_trained_i4d_weights = True
+    use_trained_i4d_weights = False
     if use_trained_i4d_weights:
-        trained_i4d_weights = torch.load("logs/falcon_smooth_witch_2x128_w-30_new_loss/models/model_2000.pth")
+        # trained_i4d_weights = torch.load("logs/armadillo_2x256_w-30_twist_t=0_0.5/models/model_1000.pth")
+        trained_i4d_weights = torch.load("logs/falcon_witch_96x1_w0_20_t_-0.2_0.2/models/model_1000.pth")
         model.load_state_dict(trained_i4d_weights)
         model.to(device=device)
 
@@ -277,9 +277,12 @@ if __name__ == "__main__":
     if use_trained_i3d_weights:
         #layer_0 = model.net[0][0].weight[...,3].unsqueeze(-1)
         # i3d_weights = torch.load("shapeNets/dragon_2x256_w-60.pth")
-        #i3d_weights = torch.load("shapeNets/bunny_2x256_w-30.pth")
+        #i3d_weights = torch.load("shapeNets/armadillo_2x256_w-60.pth")
+        i3d_weights = torch.load("shapeNets/bunny_2x256_w-30.pth")
         #i3d_weights = torch.load("shapeNets/witch_2x128_w0-30.pth")
-        i3d_weights = torch.load("shapeNets/falcon_2x128_w0-30.pth")
+        # i3d_weights = torch.load("shapeNets/falcon_2x128_w0-30.pth")
+        #i3d_weights = torch.load("shapeNets/torus_1x64_w0-16.pth")
+        #i3d_weights = torch.load("shapeNets/spot_1x64_w0-16.pth")
         first_layer = i3d_weights['net.0.0.weight']
         new_first_layer = torch.cat((first_layer,torch.zeros_like(first_layer[...,0].unsqueeze(-1))), dim=-1) #initialize with zeros
         #new_first_layer = torch.cat((first_layer, layer_0), dim=-1) #initialize using siren scheme
@@ -291,22 +294,22 @@ if __name__ == "__main__":
         print(model)
 
     #zero checkpoint
-    N = 7    # number of samples of the interval time
-    for i in range(N):
-        T = (-1 + 2*(i/(N-1)))*0.2 
-        mesh_file = f"epoch_{0}_time_{T}.ply"
-        verts, faces, normals, _ = create_mesh(
-            model,
-            filename=os.path.join(full_path, "reconstructions", mesh_file), 
-            t=T,  # time instant for 4d SIREN function
-            N= parameter_dict["reconstruction"]["resolution"],
-            device=device
-        )
+    # N = 7    # number of samples of the interval time
+    # for i in range(N):
+    #     T = (-1 + 2*(i/(N-1)))
+    #     mesh_file = f"epoch_{0}_time_{T}.ply"
+    #     verts, faces, normals, _ = create_mesh(
+    #         model,
+    #         filename=os.path.join(full_path, "reconstructions", mesh_file), 
+    #         t=T,  # time instant for 4d SIREN function
+    #         N= parameter_dict["reconstruction"]["resolution"],
+    #         device=device
+    #     )
 
-        #adding checkpoint to kaolin
-        tensor_faces = torch.from_numpy(faces.copy())
-        tensor_verts = torch.from_numpy(verts.copy())
-        timelapse.add_mesh_batch(category=f"output_{i}", iteration=0, faces_list=[tensor_faces], vertices_list=[tensor_verts])
+    #     #adding checkpoint to kaolin
+    #     tensor_faces = torch.from_numpy(faces.copy())
+    #     tensor_verts = torch.from_numpy(verts.copy())
+    #     timelapse.add_mesh_batch(category=f"output_{i}", iteration=0, faces_list=[tensor_faces], vertices_list=[tensor_verts])
 
 
     opt_params = parameter_dict["optimizer"]
@@ -326,6 +329,8 @@ if __name__ == "__main__":
             loss_fn = sdf_boundary_problem
         elif loss == "loss_mean_curv":
             loss_fn = loss_mean_curv
+        elif loss == "loss_mean_curv_with_restrictions":
+            loss_fn = loss_mean_curv_with_restrictions
         elif loss == "loss_eikonal":
             loss_fn = loss_eikonal
         elif loss == "loss_eikonal_mean_curv":
@@ -363,12 +368,4 @@ if __name__ == "__main__":
         device,
         config_dict,
         silent=args.silent
-    )
-    loss_df = pd.DataFrame.from_dict(losses)
-    loss_df.to_csv(os.path.join(full_path, "losses.csv"), sep=";", index=None)
-
-    # saving the final model
-    torch.save(
-        model.state_dict(),
-        os.path.join(full_path, "models", "model_final.pth")
     )

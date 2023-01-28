@@ -591,7 +591,8 @@ class SpaceTimePointCloudNI(Dataset):
         
         off_spacetime_coords = np.random.uniform(-1, 1, size=(n_points, 3))
         # off_spacetime_time = np.random.uniform(self.min_time, self.max_time, size=(n_points, 1))
-        off_spacetime_time = np.random.uniform(0.0, 0.5, size=(n_points, 1))
+        # off_spacetime_time = np.random.uniform(-1, 1, size=(n_points, 1))
+        off_spacetime_time = np.random.uniform(-0.2, 0.2, size=(n_points, 1))
 
         # warning: time goes from -1 to 1
         samples = torch.cat((

@@ -1,0 +1,30 @@
+{
+    "description": "SIREN Learning of the spot mesh.",
+    "space_time": true,
+    "num_epochs": 52000,
+    "sampling_opts": {
+        "samples_on_surface": 2930,
+        "samples_off_surface": 2930,
+        "random_surf_samples": true,
+        "sampler": false
+    },
+    "dataset": [["spot.ply", "shapeNets/spot_1x64_w0-16.pth", 0.0]],
+    "batch_size": 2930,
+    "checkpoint_path": "logs",
+    "experiment_name": "spot_1x64_w0-16_mean_curv_restrictions",
+    "epochs_to_checkpoint": 1000,
+    "epochs_to_reconstruction": 1000,
+    "loss": "loss_mean_curv_with_restrictions",
+    "optimizer": {
+        "type": "adam",
+        "lr": 1e-4
+    },
+    "reconstruction": {
+        "resolution": 256,
+        "output_file": "final"
+    },
+    "network": {
+        "hidden_layer_nodes": [64,64],
+        "w0": 16
+    }
+}

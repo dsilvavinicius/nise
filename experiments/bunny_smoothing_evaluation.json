@@ -8,10 +8,10 @@
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["bunny.ply", "shapeNets/bunny_2x256_w-30.pth", -0.6]],
-    "batch_size": 60000,
+    "dataset": [["bunny.ply", "shapeNets/bunny_2x256_w-30.pth", 0.0]],
+    "batch_size": 50000,
     "checkpoint_path": "logs",
-    "experiment_name": "bunny_2x256_w-30_mean_curv_init-siren",
+    "experiment_name": "bunny_2x256_w-30_mean_curv_init_i3d",
     "epochs_to_checkpoint": 500,
     "epochs_to_reconstruction": 500,
     "loss": "loss_mean_curv",

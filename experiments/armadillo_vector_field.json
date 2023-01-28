@@ -9,9 +9,9 @@
         "sampler": false
     },
     "dataset": [["armadillo.ply", "shapeNets/armadillo_2x256_w-60.pth", 0.0]],
-    "batch_size": 40000,
+    "batch_size": 50000,
     "checkpoint_path": "logs",
-    "experiment_name": "armadillo_2x256_w-30_twist_t=0_0.5",
+    "experiment_name": "armadillo_1x512_w-30_vector_field",
     "epochs_to_checkpoint": 1000,
     "epochs_to_reconstruction": 1000,
     "loss": "loss_level_set",
@@ -24,7 +24,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [256,256,256],
+        "hidden_layer_nodes": [512,512],
         "w0": 30
     }
 }

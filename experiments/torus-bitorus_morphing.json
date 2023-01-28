@@ -3,28 +3,28 @@
     "space_time": true,
     "num_epochs": 100001,
     "sampling_opts": {
-        "samples_on_surface": 70000,
-        "samples_off_surface": 70000,
+        "samples_on_surface": 2000,
+        "samples_off_surface": 2000,
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["falcon_sub.ply", -0.1],["witch.ply", 0.1]],
-    "batch_size": 35000,
+    "dataset": [["torus.ply", -0.1],["bitorus.ply", 0.1]],
+    "batch_size": 2000,
     "checkpoint_path": "logs",
-    "experiment_name": "falcon_smooth_witch_tanh_4x512_t_-0.1_0.1",
-    "epochs_to_checkpoint": 5000,
-    "epochs_to_reconstruction": 5000,
+    "experiment_name": "torus_bitorus_2x64_t_-0.1_0.1",
+    "epochs_to_checkpoint": 1000,
+    "epochs_to_reconstruction": 1000,
     "loss": "loss_morphing_two_sirens",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4
     },
     "reconstruction": {
-        "resolution":256,
+        "resolution": 128,
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [512,512,512,512,512],
-        "w0": 30
+        "hidden_layer_nodes": [64,64,64],
+        "w0": 20
     }
 }

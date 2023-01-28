@@ -8,12 +8,12 @@
         "random_surf_samples": true,
         "sampler": false
     },
-    "dataset": [["falcon_sub.ply", -0.1],["witch.ply", 0.1]],
-    "batch_size": 35000,
+    "dataset": [["falcon_smooth.ply", -0.2],["witch.ply", 0.2]],
+    "batch_size": 40000,
     "checkpoint_path": "logs",
-    "experiment_name": "falcon_smooth_witch_tanh_4x512_t_-0.1_0.1",
-    "epochs_to_checkpoint": 5000,
-    "epochs_to_reconstruction": 5000,
+    "experiment_name": "falcon_witch_128x2_w0_30_t_-0.2_0.2",
+    "epochs_to_checkpoint": 1000,
+    "epochs_to_reconstruction": 1000,
     "loss": "loss_morphing_two_sirens",
     "optimizer": {
         "type": "adam",
@@ -24,7 +24,7 @@
         "output_file": "final"
     },
     "network": {
-        "hidden_layer_nodes": [512,512,512,512,512],
+        "hidden_layer_nodes": [128,128,128],
         "w0": 30
     }
 }

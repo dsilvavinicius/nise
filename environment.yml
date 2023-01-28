@@ -1,16 +1,16 @@
 name: i4d
 channels:
   - conda-forge
-  - pytorch-nightly
+  # - pytorch-nightly
 dependencies:
   - PyOpenGL==3.1.0
   - trimesh
   - numpy
   - pandas
   - plyfile
-  - pytorch
+  # - pytorch
   - tensorboard
-   - kaolin
+  # - kaolin # install from source
   - pip
   - pip:  
     - mesh-to-sdf

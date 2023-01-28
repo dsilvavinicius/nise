@@ -215,27 +215,27 @@ if __name__ == "__main__":
     #     datasets[0] = [datasets[0][0], datasets[0][2]]
 
     # TODO: think in how to consider multiples trained sirens
-    # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
+    pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
     #pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=20)
-    pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
-    pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
+    #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    pretrained_ni1.load_state_dict(torch.load('shapeNets/torus_1x64_w0-16.pth'))
     # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
     #pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
-    # pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
     pretrained_ni1.eval()
     pretrained_ni1.to(device) 
 
     # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
-    # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
+    #pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
     #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     
     pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
-    pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
+    #pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
     pretrained_ni2.eval()
     pretrained_ni2.to(device)
 
@@ -257,7 +257,6 @@ if __name__ == "__main__":
             sampling_config["samples_off_surface"]
         )
 
-    hidden_layers = parameter_dict["network"]["hidden_layer_nodes"]
     model = lipmlp(
         n_in_features,
         n_out_features=1,
@@ -270,23 +269,7 @@ if __name__ == "__main__":
         model.load_state_dict(trained_i4d_weights)
         model.to(device=device)
 
-    #use the weights of a trained i3d net
-    use_trained_i3d_weights = False
-    if use_trained_i3d_weights:
-        #layer_0 = model.net[0][0].weight[...,3].unsqueeze(-1)
-        # i3d_weights = torch.load("shapeNets/dragon_2x256_w-60.pth")
-        #i3d_weights = torch.load("shapeNets/bunny_2x256_w-30.pth")
-        i3d_weights = torch.load("shapeNets/witch_2x128_w0-30.pth")
-        #i3d_weights = torch.load("shapeNets/falcon_smooth_2x128_w0-30.pth")
-        first_layer = i3d_weights['net.0.0.weight']
-        new_first_layer = torch.cat((first_layer,torch.zeros_like(first_layer[...,0].unsqueeze(-1))), dim=-1) #initialize with zeros
-        #new_first_layer = torch.cat((first_layer, layer_0), dim=-1) #initialize using siren scheme
-        i3d_weights['net.0.0.weight'] = new_first_layer
-        model.load_state_dict(i3d_weights)
-        model.to(device=device)
-
-    if not args.silent:
-        print(model)
+    print(model)
 
     opt_params = parameter_dict["optimizer"]
     if opt_params["type"] == "adam":
@@ -344,12 +327,4 @@ if __name__ == "__main__":
         device,
         config_dict,
         silent=args.silent
-    )
-    loss_df = pd.DataFrame.from_dict(losses)
-    loss_df.to_csv(os.path.join(full_path, "losses.csv"), sep=";", index=None)
-
-    # saving the final model
-    torch.save(
-        model.state_dict(),
-        os.path.join(full_path, "models", "model_final.pth")
     )
