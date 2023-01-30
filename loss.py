@@ -439,19 +439,18 @@ def loss_transport(X, gt):
 def loss_mean_curv(X, gt):
     gt_sdf = gt["sdf"]
     gt_normals = gt["normals"]
-    
     coords = X["model_in"]
     pred_sdf = X["model_out"]
 
     grad = gradient(pred_sdf, coords)
 
     # PDE constraints
-    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
+    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.0001)
     # mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.025) #for dumbbell
-    
+
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
-    grad = grad[...,0:3] 
-    
+    grad = grad[..., 0:3]
+
     # Initial-boundary constraints of the Eikonal equation at t=0
     #sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
     #normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
@@ -460,15 +459,15 @@ def loss_mean_curv(X, gt):
 
     sdf_constraint = torch.where( gt_sdf!=-1, (gt_sdf - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
     normal_constraint = torch.where(
-           gt_sdf!=-1,
-           1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-           torch.zeros_like(grad[..., :1])
+        gt_sdf==0.0,
+        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+        torch.zeros_like(grad[..., :1])
     )
 
     return {
         "sdf_constraint": sdf_constraint.mean() * 1e3,
         "normal_constraint": normal_constraint.mean() * 1e1,
-        "mean_curvature_constraint": mean_curvature_constraint.mean()*1e3,
+        "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
     }
 
 

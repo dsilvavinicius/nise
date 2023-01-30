@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import   SpaceTimePointCloud, SpaceTimePointCloudNI
+from dataset import SpaceTimePointCloud, SpaceTimePointCloudNI
 from model import SIREN
 from samplers import SitzmannSampler
 from loss import loss_level_set, loss_mean_curv_with_restrictions, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
