@@ -6,8 +6,9 @@ import open3d as o3d
 import open3d.core as o3c
 import torch
 from torch.utils.data import Dataset
-
+from model import SIREN
 from util import gradient
+
 
 
 def _sample_on_surface(mesh: o3d.t.geometry.TriangleMesh,
@@ -321,7 +322,6 @@ class SpaceTimePointCloudNI(Dataset):
 
         self.device = device
         self.samples_on_surface = samples_on_surface
-        self.no_sampler = True
         self.batch_size = batch_size
 
         # This is a mode-2 tensor that will hold our surface samples for all
@@ -382,9 +382,7 @@ class SpaceTimePointCloudNI(Dataset):
             print("Done preparing the dataset.")
 
     def __len__(self):
-        if self.no_sampler:
-            return 4 * self.samples_on_surface // self.batch_size
-        return self.samples_on_surface
+        return 4 * self.samples_on_surface // self.batch_size
 
     def __getitem__(self, idx):
         return self._random_sampling(self.batch_size)

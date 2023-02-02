@@ -445,7 +445,7 @@ def loss_mean_curv(X, gt):
     grad = gradient(pred_sdf, coords)
 
     # PDE constraints
-    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.0001)
+    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
     # mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.025) #for dumbbell
 
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
@@ -466,9 +466,9 @@ def loss_mean_curv(X, gt):
     # Hack to calculate the normal constraint only on points whose normals
     # lie on the surface, since we mark all others with -1 in all coordinates.
     # Note that the valid normals must have unit length.
-    normallen = gt_normals.norm(dim=1).detach()
+    #normallen = gt_normals.norm(dim=1).detach()
     normal_constraint = torch.where(
-        normallen == 1.0,
+        gt_normals[..., 0].unsqueeze(-1) != -1.,
         1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
         torch.zeros_like(grad[..., :1])
     )

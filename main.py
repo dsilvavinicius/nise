@@ -126,16 +126,16 @@ def train_model(dataset, model, device, train_config, silent=False):
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
             
-            N = 6    # number of samples of the interval time
-            #T= -0.1#-0.75
-            for i in range(N):
-                T = (-1 + 2*(i/(N-1)))*0.2
+            #N = 6    # number of samples of the interval time
+            T= [-0.1, 0.0, 0.1, 0.2,0.3, 0.4, 0.5]
+            for t in T:
+                #T = (-1 + 2*(i/(N-1)))*0.2
                 #T = (-1 + 2*(i/(N-1)))
-                mesh_file = f"epoch_{epoch}_time_{T}.ply"
+                mesh_file = f"epoch_{epoch}_time_{t}.ply"
                 verts, faces, normals, _ = create_mesh(
                     model,
                     filename=os.path.join(full_path, "reconstructions", mesh_file), 
-                    t=T,  # time instant for 4d SIREN function
+                    t=t,  # time instant for 4d SIREN function
                     N=mesh_resolution,
                     device=device
                 )
@@ -203,48 +203,48 @@ if __name__ == "__main__":
     for d in datasets:
         d[0] = os.path.join("data", d[0])
 
-    # if len(datasets[0]) == 3:
-    #     #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
-    #     # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
-    #     # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
-    #     # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
-    #     pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
-    #     # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
-    #     pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
-    #     pretrained_ni.eval()
-    #     pretrained_ni.to(device) 
-    #     datasets[0] = [datasets[0][0], datasets[0][2]]
+    if len(datasets[0]) == 3:
+        #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+        # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
+        # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
+        # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
+        pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
+        # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
+        pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
+        pretrained_ni.eval()
+        pretrained_ni.to(device) 
+        datasets[0] = [datasets[0][0], datasets[0][2]]
 
-    # TODO: think in how to consider multiples trained sirens
-    # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
-    pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=20)
-    #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
-    #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
-    #pretrained_ni1.load_state_dict(torch.load('shapeNets/torus_1x64_w0-16.pth'))
-    # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
-    pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
-    pretrained_ni1.eval()
-    pretrained_ni1.to(device) 
+    # # TODO: think in how to consider multiples trained sirens
+    # # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
+    # pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=20)
+    # #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
+    # #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    # #pretrained_ni1.load_state_dict(torch.load('shapeNets/torus_1x64_w0-16.pth'))
+    # # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
+    # pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
+    # pretrained_ni1.eval()
+    # pretrained_ni1.to(device) 
 
-    # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
-    pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
-    #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    # # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
+    # #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     
-    # pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
-    #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
-    # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
-    pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
-    pretrained_ni2.eval()
-    pretrained_ni2.to(device)
+    # # pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
+    # #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
+    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
+    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
+    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
+    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
+    # pretrained_ni2.eval()
+    # pretrained_ni2.to(device)
 
     dataset = SpaceTimePointCloudNI(
         datasets,
         sampling_config["samples_on_surface"],
-        pretrained_ni=[pretrained_ni1, pretrained_ni2],
-        # pretrained_ni=[pretrained_ni],
+        #pretrained_ni=[pretrained_ni1, pretrained_ni2],
+        pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
         device=device
@@ -273,7 +273,7 @@ if __name__ == "__main__":
         model.to(device=device)
 
     #use the weights of a trained i3d net
-    use_trained_i3d_weights = False
+    use_trained_i3d_weights = True
     if use_trained_i3d_weights:
         #layer_0 = model.net[0][0].weight[...,3].unsqueeze(-1)
         # i3d_weights = torch.load("shapeNets/dragon_2x256_w-60.pth")
