@@ -86,14 +86,13 @@ def create_mesh(
         scale,
     )
 
-    # if filename:
-    #     if not silent:
-    #         print(f"Saving mesh to {filename}")
+    if filename:
+        if not silent:
+            print(f"Saving mesh to {filename}")
 
-    #     save_ply(verts, faces, filename)
-
-    #     if not silent:
-    #         print("Done")
+        save_ply(verts, faces, filename)
+        if not silent:
+            print("Done")
 
     return verts, faces, normals, values
 

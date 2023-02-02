@@ -457,9 +457,18 @@ def loss_mean_curv(X, gt):
     #sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
     #grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
 
-    sdf_constraint = torch.where( gt_sdf!=-1, (gt_sdf - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
+    sdf_constraint = torch.where(
+        gt_sdf != -1,
+        (gt_sdf - pred_sdf) ** 2,
+        torch.zeros_like(pred_sdf)
+    )
+
+    # Hack to calculate the normal constraint only on points whose normals
+    # lie on the surface, since we mark all others with -1 in all coordinates.
+    # Note that the valid normals must have unit length.
+    normallen = gt_normals.norm(dim=1).detach()
     normal_constraint = torch.where(
-        gt_sdf==0.0,
+        normallen == 1.0,
         1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
         torch.zeros_like(grad[..., :1])
     )
