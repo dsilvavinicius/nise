@@ -30,6 +30,9 @@ class SineLayer(nn.Module):
     def forward(self, x):
         return torch.sin(self.w0 * x)
 
+    def __repr__(self):
+        return f"SineLayer(w0={self.w0})"
+
 
 class SIREN(nn.Module):
     """SIREN Module
@@ -50,21 +53,43 @@ class SIREN(nn.Module):
     w0: number, optional
         Frequency multiplier for the Sine layers. Only useful for training the
         model. Default value is 30, as per [1].
+
+    ww: number, optional
+        Frequency multiplier for the hidden Sine layers. Only useful for
+        training the model. Default value is None.
+
+    delay_init: boolean, optional
+        Indicates if we should perform the weight initialization or not.
+        Default value is False, meaning that we perform the weight
+        initialization as usual. This is useful if we will load the weights of
+        a pre-trained network, in this case, initializing the weights does not
+        make sense, since they will be overwritten.
+
+    References
+    ----------
+    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
+    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
+    Activation Functions. ArXiv. http://arxiv.org/abs/2006.09661
     """
     def __init__(self, n_in_features, n_out_features, hidden_layer_config=[],
-                 w0=30):
+                 w0=30, ww=None, delay_init=False):
         super().__init__()
         self.w0 = w0
+        if ww is None:
+            self.ww = w0
+        else:
+            self.ww = ww
+
         net = []
         net.append(nn.Sequential(
             nn.Linear(n_in_features, hidden_layer_config[0]),
-            SineLayer(w0)
+            SineLayer(self.w0)
         ))
 
         for i in range(1, len(hidden_layer_config)):
             net.append(nn.Sequential(
                 nn.Linear(hidden_layer_config[i-1], hidden_layer_config[i]),
-                SineLayer(w0)
+                SineLayer(self.ww)
             ))
 
         net.append(nn.Sequential(
@@ -72,8 +97,9 @@ class SIREN(nn.Module):
         ))
 
         self.net = nn.Sequential(*net)
-        self.net[0].apply(first_layer_sine_init)
-        self.net[1:].apply(lambda module: sine_init(module, w0))
+        if not delay_init:
+            self.net[0].apply(first_layer_sine_init)
+            self.net[1:].apply(lambda module: sine_init(module, self.ww))
 
     def forward(self, x):
         """Forward pass of the model.
