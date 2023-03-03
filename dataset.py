@@ -7,8 +7,7 @@ import open3d.core as o3c
 import torch
 from torch.utils.data import Dataset
 from model import SIREN
-from util import gradient
-
+from diff_operators import gradient
 
 
 def _sample_on_surface(mesh: o3d.t.geometry.TriangleMesh,
@@ -305,15 +304,9 @@ class SpaceTimePointCloudNI(Dataset):
         Whether to report the progress of loading and processing the mesh (if
         set to False, default behavior), or not (if True).
 
-    pretrained_ni: list of tuples[SIREN, number], optional
-        You may provide a pre-trained neural network to be used for points
-        where SDF!=0. This may help reduce running times since we avoid a
-        costly closest point calculation. As for `mesh_paths`, we pass the
-        model and time associated to it.
-
     See Also
     --------
-    trimesh.load, mesh_to_sdf.get_surface_point_cloud,
+    open3d.io.read_triangle_mesh, open3d.t.geometry.TriangleMesh.from_legacy,
     _sample_on_surface
     """
     def __init__(self, mesh_paths, samples_on_surface, pretrained_ni,
@@ -790,9 +783,6 @@ class SpaceTimePointCloudNILipschitz(Dataset):
             torch.full(size=(n_points, 1), fill_value=-1, dtype=torch.float32),
         ), dim=1)
         return samples
-
-
-
 
 
 if __name__ == "__main__":
