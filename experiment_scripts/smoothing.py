@@ -6,7 +6,7 @@ import os.path as osp
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from dataset import SpaceTimePointCloud, SpaceTimePointCloudNI
+from dataset import SpaceTimePointCloudNI
 from loss import loss_mean_curv
 from meshing import create_mesh
 from model import SIREN
@@ -19,7 +19,7 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
     Parameters
     ----------
     model: torch.nn.Module
-        The model to run the inference. Must accept \mathbb{R}^4 inputs.
+        The model to run the inference. Must accept $\mathbb{R}^4$ inputs.
 
     times: collection of numbers
         The timesteps to use as input for `model`. The number of meshes
@@ -53,7 +53,7 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-EXPERIMENT = "smooth_noisy_bunny"
+EXPERIMENT = "speedballs"
 EPOCHS = 500
 NSAMPLES = 106702
 BATCHSIZE = 50000
@@ -102,7 +102,7 @@ if use_trained_i3d_weights:
     model.load_state_dict(i3d_weights)
 
 optimizer = torch.optim.Adam(
-     lr=1e-4,
+    lr=1e-4,
     params=model.parameters()
 )
 
