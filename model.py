@@ -203,7 +203,9 @@ class SIREN(nn.Module):
         # The second-to-last key is the last weights tensor.
         llw = other[keys[-2]].shape[1]
         # my_sd[keys[-2]] = torch.zeros_like(my_sd[keys[-2]])
-        my_sd[keys[-2]].uniform_(-np.sqrt(6 / 4) / self.ww, np.sqrt(6 / 4) / self.ww)
+        outlayer_w = my_sd[keys[-2]].size(-1)
+        m1 = np.sqrt(6.0 / outlayer_w) / self.ww
+        my_sd[keys[-2]].uniform_(-m1, m1)
         my_sd[keys[-2]][:, :llw] = other[keys[-2]]
 
         # Handling the intermediate layer weights.
@@ -214,7 +216,7 @@ class SIREN(nn.Module):
             my_sd[k] = z
 
         # Handling the layers biases.
-        for k in keys[1:-2:2]:
+        for k in keys[1::2]:
             ll = other[k].shape[0]
             z = torch.zeros_like(my_sd[k])
             z[:ll] = other[k]
