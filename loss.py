@@ -446,48 +446,54 @@ def loss_transport(X, gt):
         "transport_constraint": transport_constraint.mean()*1e2,
     }
 
-def loss_mean_curv(X, gt):
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
 
-    grad = gradient(pred_sdf, coords)
+class LossMeanCurvature(torch.nn.Module):
+    def __init__(self, scale=0.001):
+        super(LossMeanCurvature, self).__init__()
+        self.scale = scale
 
-    # PDE constraints
-    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
-    # mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.025) #for dumbbell
+    def forward(self, X, gt):
+        gt_sdf = gt["sdf"]
+        gt_normals = gt["normals"]
+        coords = X["model_in"]
+        pred_sdf = X["model_out"]
 
-    #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
-    grad = grad[..., 0:3]
+        grad = gradient(pred_sdf, coords)
 
-    # Initial-boundary constraints of the Eikonal equation at t=0
-    #sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    #normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
-    #sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
-    #grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
+        # PDE constraints
+        mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=self.scale)
+        # mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.025) #for dumbbell
 
-    sdf_constraint = torch.where(
-        gt_sdf != -1,
-        (gt_sdf - pred_sdf) ** 2,
-        torch.zeros_like(pred_sdf)
-    )
+        #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+        grad = grad[..., 0:3]
 
-    # Hack to calculate the normal constraint only on points whose normals
-    # lie on the surface, since we mark all others with -1 in all coordinates.
-    # Note that the valid normals must have unit length.
-    #normallen = gt_normals.norm(dim=1).detach()
-    normal_constraint = torch.where(
-        gt_normals[..., 0].unsqueeze(-1) != -1.,
-        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-        torch.zeros_like(grad[..., :1])
-    )
+        # Initial-boundary constraints of the Eikonal equation at t=0
+        #sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
+        #normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+        #sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
+        #grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
 
-    return {
-        "sdf_constraint": sdf_constraint.mean() * 1e3,
-        "normal_constraint": normal_constraint.mean() * 1e1,
-        "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
-    }
+        sdf_constraint = torch.where(
+            gt_sdf != -1,
+            (gt_sdf - pred_sdf) ** 2,
+            torch.zeros_like(pred_sdf)
+        )
+
+        # Hack to calculate the normal constraint only on points whose normals
+        # lie on the surface, since we mark all others with -1 in all coordinates.
+        # Note that the valid normals must have unit length.
+        #normallen = gt_normals.norm(dim=1).detach()
+        normal_constraint = torch.where(
+            gt_normals[..., 0].unsqueeze(-1) != -1.,
+            1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+            torch.zeros_like(grad[..., :1])
+        )
+
+        return {
+            "sdf_constraint": sdf_constraint.mean() * 1e3,
+            "normal_constraint": normal_constraint.mean() * 1e1,
+            "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
+        }
 
 
 def loss_mean_curv_with_restrictions(X, gt):
