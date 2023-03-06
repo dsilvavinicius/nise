@@ -13,7 +13,7 @@ from plyfile import PlyData
 import torch
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
-from loss import loss_mean_curv
+from loss import LossMeanCurvature
 from meshing import create_mesh
 from model import SIREN
 from util import create_output_paths, from_pth
@@ -375,16 +375,13 @@ class STPointCloudNI(Dataset):
         self.vertices_ni = list(zip(vertices, ni))
 
         self.off_surf_sampler = torch.distributions.uniform.Uniform(-1, 1)
-        self.time_sampler = torch.distributions.uniform.Uniform(-0.1, 0.6)
-        # self.int_times_normals, self.int_times_sdf = None, None
-
-        # self._buildcache()
+        self.time_sampler = torch.distributions.uniform.Uniform(-0.2, 1.0)
 
     def __len__(self):
         return sum([m.shape[0] for m, _ in self.vertices_ni])
 
     def __getitem__(self, n):
-        data = create_training_data(
+        return create_training_data(
             self.vertices_ni,
             n_samples=self.batchsize,
             fraction_on_surface=self.fraction_on_surface,
@@ -393,19 +390,6 @@ class STPointCloudNI(Dataset):
             time_sampler=self.time_sampler,
             device=self.device
         )
-        # data["int_times"] = [
-        #     data["int_times"][0],
-        #     self.int_times_normals,
-        #     self.int_times_sdf
-        # ]
-        return data
-
-    def _buildcache(self):
-        n_points_int_times = self.batchsize - (math.ceil(self.batchsize * (self.fraction_on_surface + self.fraction_off_surface)))
-        self.int_times_normals = -torch.ones((n_points_int_times, 3),
-                                             device=self.device)
-        self.int_times_sdf = -torch.ones((n_points_int_times,),
-                                         device=self.device)
 
 
 if __name__ == '__main__':
@@ -421,7 +405,7 @@ if __name__ == '__main__':
     MESH = "bunny"
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    EPOCHS = 10
+    EPOCHS = 500
     BATCHSIZE = 20000
     WARMUP = 10
     EXPERIMENT = f"{MESH}_mean_curvature_{EPOCHS}epochs_i3d_init"
@@ -438,38 +422,26 @@ if __name__ == '__main__':
         os.makedirs(summarypath)
     writer = SummaryWriter(summarypath)
 
-    dataset = STPointCloudNI([(f"data/{MESH}.ply", f"ni/{MESH}.pth", 0, 60)],
+    dataset = STPointCloudNI([(f"data/{MESH}.ply", f"ni/{MESH}.pth", 0, 30)],
                              BATCHSIZE)
     nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
     print(f"Total # of training steps = {nsteps}")
 
-    model = SIREN(4, 1, [300] * 2, w0=60, delay_init=True).to(device)
+    model = SIREN(4, 1, [256] * 3, w0=30, delay_init=True).to(device)
     print(model)
 
-    # =============================================================================
-    #use the weights of a trained i3d net
-    # use_trained_i3d_weights = True
-    # if use_trained_i3d_weights:
-    #     i3d_weights = torch.load(f"ni/{MESH}.pth")
-    #     first_layer = i3d_weights['net.0.0.weight']
-    #     new_first_layer = torch.cat(
-    #         (first_layer, torch.zeros_like(first_layer[...,0].unsqueeze(-1))),
-    #         dim=-1
-    #     ) #initialize with zeros
-    #     i3d_weights['net.0.0.weight'] = new_first_layer
-    #     model.load_state_dict(i3d_weights)
     model.from_pretrained_initial_condition(torch.load(f"ni/{MESH}.pth"))
-    model.eval()
-    reconstruct_at_times(model, [0, 0.2], experimentpath, device=device)
-    model.train()
+    # mudar o intervalo do tempo: [0, 1.0],     [0, 0.5],     [0, 0.25]
+    # mudar o intervalo do tempo: [-0.1, 1.0],  [-0.1, 0.5],  [-0.1, 0.25]
+    # mudar o intervalo do tempo: [-0.25, 1.0], [-0.25, 0.5], [-0.25, 0.25]
+    # proporcoes dos pontos amostrados no tempo 0 e outros tempos
+    # [0.25, 0.25, 0.5], [0.1, 0.1, 0.8], [0.4, 0.4, 0.2]
+    # Mudar a arquitetura do i4d. começar com a mesma arquitetura do bunny e ir "engordando" a rede
 
     optim = torch.optim.Adam(
         lr=1e-4,
         params=model.parameters()
     )
-
-    # off_surf_sampler = torch.distributions.uniform.Uniform(-1, 1)
-    # time_sampler = torch.distributions.uniform.Uniform(-0.1, 0.6)
 
     trainingpts = torch.zeros((BATCHSIZE, 4), device=device)
     trainingnormals = torch.zeros((BATCHSIZE, 3), device=device)
@@ -479,20 +451,11 @@ if __name__ == '__main__':
     n_off_surface = math.floor(BATCHSIZE * 0.25)
     n_int_times = BATCHSIZE - (n_on_surface + n_off_surface)
     training_loss = {}
+    lossmeancurv = LossMeanCurvature(scale=0.001)
 
     start_training_time = time.time()
     for e in range(nsteps):
-        # data = create_training_data(
-        #     [(bunny_verts, bunny_ni)],
-        #     n_samples=BATCHSIZE,
-        #     fraction_on_surface=0.25,
-        #     fraction_off_surface=0.25,
-        #     off_surface_sampler=off_surf_sampler,
-        #     time_sampler=time_sampler,
-        #     device=device
-        # )
         data = dataset[e]
-
         # ===============================================================
         trainingpts[:n_on_surface, ...] = data["on_surf"][0]
         trainingnormals[:n_on_surface, ...] = data["on_surf"][1]
@@ -513,12 +476,12 @@ if __name__ == '__main__':
 
         optim.zero_grad(set_to_none=True)
         y = model(trainingpts)
-        loss = loss_mean_curv(y, gt)
+        loss = lossmeancurv(y, gt)
 
         running_loss = torch.zeros((1, 1), device=device)
         for k, v in loss.items():
             running_loss += v
-            writer.add_scalar(f"train/{k}_term", running_loss.detach().item(), e)
+            writer.add_scalar(f"train/{k}_term", v.detach().item(), e)
             if k not in training_loss:
                 training_loss[k] = [v.detach().item()]
             else:
@@ -539,6 +502,6 @@ if __name__ == '__main__':
     loss_df.to_csv(osp.join(experimentpath, "loss.csv"), sep=';', index=None)
 
     # model.load_state_dict(best_weights)
-    times = [-0.1, 0.0, 0.05, 0.1, 0.2, 0.6]
+    times = [-0.19, 0.0, 0.5, 0.9, 0.99]
     meshpath = osp.join(experimentpath, "reconstructions")
     reconstruct_at_times(model, times, meshpath, device=device)
