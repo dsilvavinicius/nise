@@ -99,8 +99,7 @@ class SIREN(nn.Module):
 
         self.net = nn.Sequential(*net)
         if not delay_init:
-            self.net[0].apply(first_layer_sine_init)
-            self.net[1:].apply(lambda module: sine_init(module, self.ww))
+            self.reset_weights()
 
     def forward(self, x):
         """Forward pass of the model.
@@ -122,8 +121,12 @@ class SIREN(nn.Module):
         y = self.net(coords)
         return {"model_in": coords_org, "model_out": y}
 
+    def reset_weights(self):
+        self.net[0].apply(first_layer_sine_init)
+        self.net[1:].apply(lambda module: sine_init(module, self.ww))
+
     def from_pretrained_initial_condition(self, other: OrderedDict):
-        """Application of the neural network initialization 
+        """Neural network initialization given a pretrained network.
 
         This method assumes that the network defined by `self` is as deep as
         `other`, and each layer is at least as wide as `other` as well. If the
@@ -134,6 +137,8 @@ class SIREN(nn.Module):
         `A`. Our initialization assigns:
         $A_1 = ( B_1 0; f1 f2 )$ and
         $A_i = ( B_i 0; 0  0  ), i > 1$
+
+        where $f1$ and $f2$ are weight values initilized as proposed by [1].
         
         The biases are defined as the column
         vector:
@@ -150,8 +155,13 @@ class SIREN(nn.Module):
         Returns
         -------
         model: niif.model.SIREN
-            The model with the initialization described in [1] applied, or no
-            transformation at all if `other` is not a valid state_dict.
+            The initialized model
+
+        References
+        ----------
+        [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
+        & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
+        Activation Functions. ArXiv. http://arxiv.org/abs/2006.09661
         """
         depth_other = len(other) // 2
         depth_us = len(self.state_dict()) // 2
