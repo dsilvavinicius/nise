@@ -1,5 +1,5 @@
 {
-    "description": "SIREN Learning of the Armadillo mesh.",
+    "description": "SIREN Learning of the Bunny mesh.",
     "space_time": true,
     "num_epochs": 7501,
     "sampling_opts": {
@@ -11,7 +11,7 @@
     "dataset": [["bunny.ply", "shapeNets/bunny_2x256_w-30.pth", 0.0]],
     "batch_size": 50000,
     "checkpoint_path": "logs",
-    "experiment_name": "bunny_2x256_w-30_mean_curv_init_i3d",
+    "experiment_name": "bunny_checking_smoothing",
     "epochs_to_checkpoint": 500,
     "epochs_to_reconstruction": 500,
     "loss": "loss_mean_curv",

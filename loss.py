@@ -480,6 +480,47 @@ def loss_mean_curv(X, gt):
     }
 
 
+def loss_mean_curv_denoising(X, gt):
+    gt_sdf = gt["sdf"]
+    gt_normals = gt["normals"]
+    coords = X["model_in"]
+    pred_sdf = X["model_out"]
+
+    grad = gradient(pred_sdf, coords)
+
+    # PDE constraints
+    mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
+
+    #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
+    grad = grad[..., 0:3]
+
+    # Initial-boundary constraints of the Eikonal equation at t=0
+    grad_constraint = (grad.norm(dim=-1) - 1.)**2
+    grad_constraint = torch.where(
+        gt_sdf != -1,
+        grad_constraint.unsqueeze(-1),
+        torch.zeros_like(pred_sdf)
+    )
+
+    sdf_constraint = torch.where(
+        gt_sdf != -1,
+        (gt_sdf - pred_sdf) ** 2,
+        torch.zeros_like(pred_sdf)
+    )
+
+    normal_constraint = torch.where(
+        gt_normals[..., 0].unsqueeze(-1) != -1.,
+        1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
+        torch.zeros_like(grad[..., :1])
+    )
+
+    return {
+        "sdf_constraint": sdf_constraint.mean() * 1e4,
+        "normal_constraint": normal_constraint.mean() ,#* 1e1,
+        "grad_constraint": grad_constraint.mean(),
+        "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e4,
+    }
+
 def loss_mean_curv_with_restrictions(X, gt):
     gt_sdf = gt["sdf"]
     gt_normals = gt["normals"]

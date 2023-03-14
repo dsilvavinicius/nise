@@ -7,13 +7,13 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from dataset import SpaceTimePointCloud, SpaceTimePointCloudNI
-from loss import loss_mean_curv
+from loss import loss_mean_curv, loss_mean_curv_denoising
 from meshing import create_mesh
 from model import SIREN
 from util import create_output_paths, load_experiment_parameters
 
 
-def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
+def reconstruct_at_times(model, times, epoch, meshpath, resolution=256, device="cpu"):
     """Runs marching cubes on `model` at times `times`.
 
     Parameters
@@ -45,7 +45,7 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
         for t in times:
             verts, faces, normals, _ = create_mesh(
                 model,
-                filename=osp.join(meshpath, f"time_{t}.ply"),
+                filename=osp.join(meshpath, f"epoch_{e}_time_{t}.ply"),
                 t=t,  # time instant for 4d SIREN function
                 N=resolution,
                 device=device
@@ -54,9 +54,10 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EXPERIMENT = "smooth_noisy_bunny"
-EPOCHS = 500
-NSAMPLES = 106702
-BATCHSIZE = 50000
+EPOCHS = 4000
+# NSAMPLES = 106702
+NSAMPLES = 350000
+BATCHSIZE = 60000
 WARMUP = 100
 WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
 
@@ -71,29 +72,32 @@ if not osp.exists(summarypath):
     os.makedirs(summarypath)
 writer = SummaryWriter(summarypath)
 
-# dataset = SpaceTimePointCloud(
-#     [("data/bunny_noisy_sub.ply", 0.0)],
-#     NSAMPLES,
-#     timerange=[-0.2, 0.2]
-# )
-
-bunny_ni = SIREN(3, 1, [256] * 3, w0=30).eval().to(device)
-bunny_ni.load_state_dict(torch.load("shapeNets/bunny_2x256_w-30.pth"))
-
-dataset = SpaceTimePointCloudNI(
-    [("data/bunny.ply", 0.0)],
-    samples_on_surface=NSAMPLES,
-    pretrained_ni=[bunny_ni],
+dataset = SpaceTimePointCloud(
+    [("data/bunny_noisy_sub.ply", 0.0)],
+    NSAMPLES,
     batch_size=BATCHSIZE,
-    timerange=[-0.1, 0.6],
-    device=device
+    timerange=[0.0, 0.5]
 )
 
-model = SIREN(4, 1, [256] * 3, w0=30).to(device)
+# bunny_ni = SIREN(3, 1, [256] * 3, w0=30).eval().to(device)
+# bunny_ni.load_state_dict(torch.load("shapeNets/bunny_2x256_w-30.pth"))
+
+# dataset = SpaceTimePointCloudNI(
+#     [("data/bunny.ply", 0.0)],
+#     samples_on_surface=NSAMPLES,
+#     pretrained_ni=[bunny_ni],
+#     batch_size=BATCHSIZE,
+#     timerange=[-0.1, 0.6],
+#     device=device
+# )
+
+
+
+model = SIREN(4, 1, [512, 256, 128], w0=30).to(device)
 print(model)
 
 #use the weights of a trained i3d net
-use_trained_i3d_weights = True
+use_trained_i3d_weights = False
 if use_trained_i3d_weights:
     i3d_weights = torch.load("shapeNets/bunny_2x256_w-30.pth")
     first_layer = i3d_weights['net.0.0.weight']
@@ -120,7 +124,8 @@ for e in range(EPOCHS):
 
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = loss_mean_curv(outputs, gt)
+        #loss = loss_mean_curv(outputs, gt)
+        loss = loss_mean_curv_denoising(outputs, gt)
 
         train_loss = torch.zeros((1, 1), device=device)
         for it, l in loss.items():
@@ -135,13 +140,21 @@ for e in range(EPOCHS):
             best_epoch = e
             best_weights = copy.deepcopy(model.state_dict())
 
+
+        
+
         train_loss.backward()
         optimizer.step()
     print(f"Epoch {e} -- Loss {train_loss.item()}")
+    if e>0 and e%100 == 0 :
+        #model.load_state_dict(best_weights)
+        times = [0.0, 0.1, 0.2, 0.3, 0.5]
+        meshpath = osp.join(experimentpath, "reconstructions")
+        reconstruct_at_times(model, times, e, meshpath, device=device)
 
 torch.save(best_weights, osp.join(experimentpath, "models", "weights.pth"))
 
 model.load_state_dict(best_weights)
-times = [-0.1, 0.0, 0.05, 0.1, 0.2, 0.6]
+times = [0.0, 0.1, 0.2, 0.3, 0.5]
 meshpath = osp.join(experimentpath, "reconstructions")
-reconstruct_at_times(model, times, meshpath, device=device)
+reconstruct_at_times(model, times, EPOCHS, meshpath, device=device)
