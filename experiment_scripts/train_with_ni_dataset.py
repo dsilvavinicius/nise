@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import argparse
+import copy
 import math
 import os
 import os.path as osp
@@ -13,10 +14,11 @@ from plyfile import PlyData
 import torch
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
+from diff_operators import gradient
 from loss import LossMeanCurvature
 from meshing import create_mesh
 from model import SIREN
-from util import create_output_paths, from_pth
+from util import create_output_paths, from_pth, reconstruct_at_times
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
@@ -120,20 +122,24 @@ def sample_initial_condition(
         # domain_pts = off_surf_sampler.sample((n_off_surf, 3)).to(device)
         t = surf_pts[0, 3]  # We assume that all points in surf_pts have the same value of t.
         if no_sdf is False:
-            with torch.no_grad():
-                domain_sdf = ni(domain_pts)["model_out"]
+            out = ni(domain_pts)
+            domain_sdf = out["model_out"]
+            domain_normals = gradient(domain_sdf, out["model_in"]).detach()
+            domain_sdf = domain_sdf.detach()
         else:
             domain_sdf = torch.full(
                 (n_off_surf, 1),
                 fill_value=-1,
                 device=device
             )
+            domain_normals = -torch.ones_like(domain_pts, device=device)
+
         coord_dict["off_surf"] = [
             torch.column_stack((
                 domain_pts,
                 torch.full_like(domain_pts, fill_value=t, device=device)[..., 0]
             )),  # x, y, z, t
-            torch.zeros_like(domain_pts, device=device),
+            domain_normals,
             domain_sdf.squeeze()
         ]
 
@@ -291,45 +297,6 @@ def read_ply(path: str, t: float):
     return mesh, torch.from_numpy(vertices).requires_grad_(False)
 
 
-def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
-    """Runs marching cubes on `model` at times `times`.
-
-    Parameters
-    ----------
-    model: torch.nn.Module
-        The model to run the inference. Must accept $\mathbb{R}^4$ inputs.
-
-    times: collection of numbers
-        The timesteps to use as input for `model`. The number of meshes
-        generated will be `len(times)`.
-
-    meshpath: str, PathLike
-        Base folder to save all meshes.
-
-    resolution: int, optional
-        Marching cubes resolution. The input volume will have
-        `resolution` ** 3 voxels. Default value is 256.
-
-    device: str or torch.Device, optional
-        The device where we will run the inference on `model`.
-        Default value is "cpu".
-
-    See Also
-    --------
-    i4d.meshing.create_mesh
-    """
-    model = model.eval()
-    with torch.no_grad():
-        for t in times:
-            verts, faces, normals, _ = create_mesh(
-                model,
-                filename=osp.join(meshpath, f"time_{t}.ply"),
-                t=t,  # time instant for 4d SIREN function
-                N=resolution,
-                device=device
-            )
-
-
 class STPointCloudNI(Dataset):
     """Space-time varying point clouds with NI for SDF querying.
 
@@ -396,21 +363,31 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    parser = argparse.ArgumentParser(description="Train")
-
     SEED = 668123
     np.random.seed(SEED)
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
-    MESH = "bunny"
+    MESH = "falcon"
+    NI = "ni/falcon_smooth_2x128_w0-20.pth"
+    # NI = f"ni/{MESH}"
+    W0 = 20
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     EPOCHS = 500
-    BATCHSIZE = 20000
-    WARMUP = 10
-    EXPERIMENT = f"{MESH}_mean_curvature_{EPOCHS}epochs_i3d_init"
-    WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
+    BATCHSIZE = 30000
+    dataset = STPointCloudNI(
+        [(f"data/{MESH}_sub.ply", NI, 0, W0)],
+        BATCHSIZE
+    )
+    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
+    WARMUP_STEPS = nsteps // 10
+    CHECKPOINT_AT = nsteps // 10
+    print(f"Total # of training steps = {nsteps}")
 
+    model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)
+    print(model)
+    EXPERIMENT = f"{MESH}_meancurvature_{EPOCHS}epochs_i3dinit_smooth"
+    WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
     experimentpath = create_output_paths(
         "logs",
         EXPERIMENT,
@@ -422,21 +399,10 @@ if __name__ == '__main__':
         os.makedirs(summarypath)
     writer = SummaryWriter(summarypath)
 
-    dataset = STPointCloudNI([(f"data/{MESH}.ply", f"ni/{MESH}.pth", 0, 30)],
-                             BATCHSIZE)
-    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
-    print(f"Total # of training steps = {nsteps}")
-
-    model = SIREN(4, 1, [256] * 3, w0=30, delay_init=True).to(device)
-    print(model)
-
-    model.from_pretrained_initial_condition(torch.load(f"ni/{MESH}.pth"))
-    # mudar o intervalo do tempo: [0, 1.0],     [0, 0.5],     [0, 0.25]
-    # mudar o intervalo do tempo: [-0.1, 1.0],  [-0.1, 0.5],  [-0.1, 0.25]
-    # mudar o intervalo do tempo: [-0.25, 1.0], [-0.25, 0.5], [-0.25, 0.25]
-    # proporcoes dos pontos amostrados no tempo 0 e outros tempos
-    # [0.25, 0.25, 0.5], [0.1, 0.1, 0.8], [0.4, 0.4, 0.2]
-    # Mudar a arquitetura do i4d. começar com a mesma arquitetura do bunny e ir "engordando" a rede
+    model.zero_grad(set_to_none=True)
+    # model.reset_weights()
+    model.from_pretrained_initial_condition(torch.load(NI))
+    dataset.time_sampler = torch.distributions.uniform.Uniform(-0.05, 1.0)
 
     optim = torch.optim.Adam(
         lr=1e-4,
@@ -451,7 +417,10 @@ if __name__ == '__main__':
     n_off_surface = math.floor(BATCHSIZE * 0.25)
     n_int_times = BATCHSIZE - (n_on_surface + n_off_surface)
     training_loss = {}
-    lossmeancurv = LossMeanCurvature(scale=0.001)
+    lossmeancurv = LossMeanCurvature(scale=2e-3)
+
+    best_loss = torch.inf
+    best_weigths = None
 
     start_training_time = time.time()
     for e in range(nsteps):
@@ -461,13 +430,13 @@ if __name__ == '__main__':
         trainingnormals[:n_on_surface, ...] = data["on_surf"][1]
         trainingsdf[:n_on_surface] = data["on_surf"][2]
 
-        trainingpts[n_off_surface:n_int_times, ...] = data["off_surf"][0]
-        trainingnormals[n_off_surface:n_int_times, ...] = data["off_surf"][1]
-        trainingsdf[n_off_surface:n_int_times, ...] = data["off_surf"][2].squeeze()
+        trainingpts[n_on_surface:(n_on_surface + n_off_surface), ...] = data["off_surf"][0]
+        trainingnormals[n_on_surface:(n_on_surface + n_off_surface), ...] = data["off_surf"][1]
+        trainingsdf[n_on_surface:(n_on_surface + n_off_surface), ...] = data["off_surf"][2].squeeze()
 
-        trainingpts[n_int_times:, ...] = data["int_times"][0]
-        trainingnormals[n_int_times:, ...] = data["int_times"][1]
-        trainingsdf[n_int_times:, ...] = data["int_times"][2]
+        trainingpts[(n_on_surface + n_off_surface):, ...] = data["int_times"][0]
+        trainingnormals[(n_on_surface + n_off_surface):, ...] = data["int_times"][1]
+        trainingsdf[(n_on_surface + n_off_surface):, ...] = data["int_times"][2]
 
         gt = {
             "sdf": trainingsdf.float().unsqueeze(1),
@@ -491,6 +460,16 @@ if __name__ == '__main__':
         optim.step()
         writer.add_scalar("train/loss", running_loss.detach().item(), e)
 
+        if e > WARMUP_STEPS and best_loss > running_loss.item():
+            best_weights = copy.deepcopy(model.state_dict())
+            best_loss = running_loss.item()
+
+        if e and not e % CHECKPOINT_AT:
+            times = [-0.05, 0.0, 0.5, 0.95]
+            meshpath = osp.join(experimentpath, f"reconstructions_check_{e}")
+            os.makedirs(meshpath)
+            reconstruct_at_times(model, times, meshpath, device=device)
+
         if not e % 100 and e > 0:
             print(f"Step {e} --- Loss {running_loss.item()}")
 
@@ -498,10 +477,14 @@ if __name__ == '__main__':
     print(f"training took {training_time} s")
 
     torch.save(model.state_dict(), osp.join(experimentpath, "models", "weights.pth"))
+    torch.save(
+        best_weights, osp.join(experimentpath, "models", "best.pth")
+    )
+    model.load_state_dict(best_weights)
     loss_df = pd.DataFrame.from_dict(training_loss)
     loss_df.to_csv(osp.join(experimentpath, "loss.csv"), sep=';', index=None)
 
     # model.load_state_dict(best_weights)
-    times = [-0.19, 0.0, 0.5, 0.9, 0.99]
+    times = [-0.05, 0.0, 0.5, 0.95]
     meshpath = osp.join(experimentpath, "reconstructions")
-    reconstruct_at_times(model, times, meshpath, device=device)
+    reconstruct_at_times(model, times, meshpath, device=device, resolution=400)
