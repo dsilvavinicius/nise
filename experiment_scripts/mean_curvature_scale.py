@@ -378,7 +378,7 @@ if __name__ == '__main__':
         " (\"i3d\")."
     )
     parser.add_argument(
-        "--seed", "-s", default=668123, type=int,
+        "--seed", default=668123, type=int,
         help="Seed for the random-number generator."
     )
     parser.add_argument(
@@ -391,6 +391,11 @@ if __name__ == '__main__':
     parser.add_argument(
         "--epochs", "-e", default=500, type=int,
         help="Number of epochs of training to perform."
+    )
+    parser.add_argument(
+        "--scales", "-s", nargs='+', default=[1e-3, 1e-2, 1e-1], type=float,
+        help="The mean-curvature-equation scale values to use. Each value will"
+        " be used to train one neural implicit representation."
     )
     args = parser.parse_args()
 
@@ -415,8 +420,7 @@ if __name__ == '__main__':
     model = SIREN(4, 1, [256] * 3, w0=args.omega0, delay_init=True).to(device)
     print(model)
 
-    SCALES = [0.001, 0.002, 0.003, 0.004, 0.005, 0.01, 0.1]
-    for S in SCALES:
+    for S in args.scales:
         print(f"=============== S={S} ===============")
         EXPERIMENT = f"{args.mesh}_meancurvature_{args.epochs}epochs_{args.init_method}_init_s{S}"
         WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")

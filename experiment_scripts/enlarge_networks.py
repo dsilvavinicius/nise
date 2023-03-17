@@ -369,7 +369,8 @@ if __name__ == '__main__':
         help="The mesh to use. Must exist both in folders \"ni\" and \"data\"."
     )
     parser.add_argument(
-        "omega0", help="Omega_0 value to use for the pre-trained NI."
+        "omega0", type=float,
+        help="Omega_0 value to use for the pre-trained NI."
     )
     parser.add_argument(
         "--init_method", "-i", default="sitz",
@@ -377,19 +378,28 @@ if __name__ == '__main__':
         " (\"i3d\")."
     )
     parser.add_argument(
-        "--seed", "-s", default=668123,
+        "--seed", default=668123, type=int,
         help="Seed for the random-number generator."
     )
     parser.add_argument(
         "--device", "-d", default="cuda:0", help="Device to run the training."
     )
     parser.add_argument(
-        "--batchsize", "-b", default=20000,
+        "--batchsize", "-b", default=20000, type=int,
         help="Number of points to use per step of training."
     )
     parser.add_argument(
-        "--epochs", "-e", default=500,
+        "--epochs", "-e", default=500, type=int,
         help="Number of epochs of training to perform."
+    )
+    parser.add_argument(
+        "--netwidths", "-w", nargs='+', default=list(range(128, 256+16, 16)),
+        type=int, help="The network widths for all hidden layers. Each value"
+        " will be used to train one neural implicit representation."
+    )
+    parser.add_argument(
+        "--netdepth", "-n", default=3, type=int,
+        help="Depth of the neural networks. This is fixed for all experiments."
     )
     args = parser.parse_args()
 
@@ -411,8 +421,7 @@ if __name__ == '__main__':
     nsteps = round(args.epochs * (2 * len(dataset) / args.batchsize))
     print(f"Total # of training steps = {nsteps}")
 
-    NETWIDHTS = range(128, 256+16, 16)
-    for NW in NETWIDHTS:
+    for NW in args.netwidths:
         EXPERIMENT = f"{args.mesh}_meancurvature_{args.epochs}epochs_{args.init_method}_n{NW}"
         WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
         experimentpath = create_output_paths(
@@ -426,7 +435,9 @@ if __name__ == '__main__':
             os.makedirs(summarypath)
         writer = SummaryWriter(summarypath)
 
-        model = SIREN(4, 1, [NW] * 3, w0=args.omega0, delay_init=True).to(device)
+        model = SIREN(
+            4, 1, [NW] * args.netdepth, w0=args.omega0, delay_init=True
+        ).to(device)
         print(model)
         model.zero_grad(set_to_none=True)
         if args.init_method == "sitz":
