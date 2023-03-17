@@ -17,7 +17,7 @@ from diff_operators import gradient
 from loss import LossMeanCurvature
 from meshing import create_mesh
 from model import SIREN
-from util import create_output_paths, from_pth
+from util import create_output_paths, from_pth, reconstruct_at_times
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
@@ -294,45 +294,6 @@ def read_ply(path: str, t: float):
     mesh.triangle["indices"] = o3c.Tensor(faces, dtype=o3c.int32)
 
     return mesh, torch.from_numpy(vertices).requires_grad_(False)
-
-
-def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
-    """Runs marching cubes on `model` at times `times`.
-
-    Parameters
-    ----------
-    model: torch.nn.Module
-        The model to run the inference. Must accept $\mathbb{R}^4$ inputs.
-
-    times: collection of numbers
-        The timesteps to use as input for `model`. The number of meshes
-        generated will be `len(times)`.
-
-    meshpath: str, PathLike
-        Base folder to save all meshes.
-
-    resolution: int, optional
-        Marching cubes resolution. The input volume will have
-        `resolution` ** 3 voxels. Default value is 256.
-
-    device: str or torch.Device, optional
-        The device where we will run the inference on `model`.
-        Default value is "cpu".
-
-    See Also
-    --------
-    i4d.meshing.create_mesh
-    """
-    model = model.eval()
-    with torch.no_grad():
-        for t in times:
-            verts, faces, normals, _ = create_mesh(
-                model,
-                filename=osp.join(meshpath, f"time_{t}.ply"),
-                t=t,  # time instant for 4d SIREN function
-                N=resolution,
-                device=device
-            )
 
 
 class STPointCloudNI(Dataset):
