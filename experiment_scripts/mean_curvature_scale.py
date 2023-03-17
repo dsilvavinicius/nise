@@ -409,7 +409,8 @@ if __name__ == '__main__':
         help="The mesh to use. Must exist both in folders \"ni\" and \"data\"."
     )
     parser.add_argument(
-        "omega0", help="Omega_0 value to use for the pre-trained NI."
+        "omega0", type=float,
+        help="Omega_0 value to use for the pre-trained NI."
     )
     parser.add_argument(
         "--init_method", "-i", default="sitz",
@@ -417,18 +418,18 @@ if __name__ == '__main__':
         " (\"i3d\")."
     )
     parser.add_argument(
-        "--seed", "-s", default=668123,
+        "--seed", "-s", default=668123, type=int,
         help="Seed for the random-number generator."
     )
     parser.add_argument(
         "--device", "-d", default="cuda:0", help="Device to run the training."
     )
     parser.add_argument(
-        "--batchsize", "-b", default=20000,
+        "--batchsize", "-b", default=20000, type=int,
         help="Number of points to use per step of training."
     )
     parser.add_argument(
-        "--epochs", "-e", default=500,
+        "--epochs", "-e", default=500, type=int,
         help="Number of epochs of training to perform."
     )
     args = parser.parse_args()
