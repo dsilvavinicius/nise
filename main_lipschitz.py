@@ -4,22 +4,23 @@ import argparse
 import json
 import os
 import warnings
+import kaolin
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import   SpaceTimePointCloud, SpaceTimePointCloudNI, SpaceTimePointCloudNILipschitz
-from model_lipschitz_mlp import lipmlp
-from model import SIREN
-from samplers import SitzmannSampler
-from loss import loss_level_set, loss_morphing_two_sirens, loss_GPNF, loss_mean_curv, sdf_sitzmann, true_sdf_off_surface, sdf_sitzmann_time, sdf_time, sdf_boundary_problem, loss_eikonal, loss_eikonal_mean_curv, loss_constant, loss_transport, loss_vector_field_morph
-from meshing import create_mesh, create_mesh_lipschitz
-from util import create_output_paths, load_experiment_parameters
-
-import kaolin
+from i4d.dataset import SpaceTimePointCloudNILipschitz
+from i4d.model import lipmlp, SIREN
+from i4d.loss import (loss_level_set, loss_morphing_two_sirens, loss_GPNF,
+                      loss_mean_curv, sdf_sitzmann_time, sdf_time,
+                      sdf_boundary_problem, loss_eikonal,
+                      loss_eikonal_mean_curv, loss_constant,loss_transport,
+                      loss_vector_field_morph)
+from i4d.meshing import create_mesh_lipschitz
+from i4d.util import create_output_paths, load_experiment_parameters
 
 print(torch.__version__)
+
 
 def train_model(dataset, model, device, train_config, silent=False):
     BATCH_SIZE = train_config["batch_size"]
@@ -158,7 +159,7 @@ def train_model(dataset, model, device, train_config, silent=False):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage="python main.py path_to_experiments")
-    
+
     p.add_argument(
         "experiment_path",
         help="Path to the JSON experiment description file"
@@ -197,9 +198,7 @@ if __name__ == "__main__":
 
     scaling = parameter_dict.get("scaling")
 
-
     timelapse = kaolin.visualize.Timelapse(os.path.join(full_path, "kaolin"))
-
 
     dataset = None
     datasets = parameter_dict["dataset"]
@@ -223,12 +222,12 @@ if __name__ == "__main__":
     # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
     #pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
     pretrained_ni1.eval()
-    pretrained_ni1.to(device) 
+    pretrained_ni1.to(device)
 
     # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     #pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
     #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
-    
+
     pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
     #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
     pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
@@ -248,14 +247,6 @@ if __name__ == "__main__":
         silent=False,
         device=device
     )
-
-    sampler = None
-    sampler_opt = sampling_config.get("sampler")
-    if sampler_opt is not None and sampler_opt == "sitzmann":
-        sampler = SitzmannSampler(
-            dataset,
-            sampling_config["samples_off_surface"]
-        )
 
     model = lipmlp(
         n_in_features,
@@ -314,7 +305,7 @@ if __name__ == "__main__":
         "batch_size": parameter_dict["batch_size"],
         "epochs_to_checkpoint": parameter_dict["epochs_to_checkpoint"],
         "epochs_to_reconstruct": parameter_dict["epochs_to_reconstruction"],
-        "sampler": sampler,
+        "sampler": None,
         "log_path": full_path,
         "optimizer": optimizer,
         "loss_fn": loss_fn,
