@@ -11,7 +11,6 @@ from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.model import SIREN
-from i4d.samplers import SitzmannSampler
 from i4d.loss import (loss_level_set, loss_mean_curv_with_restrictions,
                       loss_morphing_two_sirens, loss_GPNF, loss_mean_curv,
                       loss_eikonal, loss_eikonal_mean_curv, loss_constant,
@@ -62,13 +61,6 @@ def train_model(dataset, model, device, train_config, silent=False):
     for epoch in range(EPOCHS):
         running_loss = dict()
         for i, data in enumerate(train_loader, start=0):
-            # If we have a custom sampler, we must reshape the Tensors from
-            # [B, N, D] to [1, B*N, D]
-            if sampler is not None:
-                for k, v in data.items():
-                    b, n, d = v.size()
-                    data[k] = v.reshape(1, -1, d)
-
             # get the inputs; data is a list of [inputs, labels]
             inputs = data["coords"].to(device)
             gt = {
@@ -128,16 +120,16 @@ def train_model(dataset, model, device, train_config, silent=False):
 
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
-            
+
             #N = 6    # number of samples of the interval time
-            T= [-0.1, 0.0, 0.1, 0.2,0.3, 0.4, 0.5]
+            T = [-0.1, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
             for t in T:
                 #T = (-1 + 2*(i/(N-1)))*0.2
                 #T = (-1 + 2*(i/(N-1)))
                 mesh_file = f"epoch_{epoch}_time_{t}.ply"
                 verts, faces, normals, _ = create_mesh(
                     model,
-                    filename=os.path.join(full_path, "reconstructions", mesh_file), 
+                    filename=os.path.join(full_path, "reconstructions", mesh_file),
                     t=t,  # time instant for 4d SIREN function
                     N=mesh_resolution,
                     device=device
@@ -147,7 +139,12 @@ def train_model(dataset, model, device, train_config, silent=False):
                 #adding checkpoint to kaolin
                 tensor_faces = torch.from_numpy(faces.copy())
                 tensor_verts = torch.from_numpy(verts.copy())
-                timelapse.add_mesh_batch(category=f"output_{i}", iteration=epoch/EPOCHS_TIL_RECONSTRUCTION, faces_list=[tensor_faces], vertices_list=[tensor_verts])
+                timelapse.add_mesh_batch(
+                    category=f"output_{i}",
+                    iteration=epoch / EPOCHS_TIL_RECONSTRUCTION,
+                    faces_list=[tensor_faces],
+                    vertices_list=[tensor_verts]
+                )
 
             model.train()
 
@@ -204,7 +201,7 @@ if __name__ == "__main__":
         d[0] = os.path.join("data", d[0])
 
     if len(datasets[0]) == 3:
-        #pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+        # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
         # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
         # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
         # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
@@ -212,7 +209,7 @@ if __name__ == "__main__":
         # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
         pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
         pretrained_ni.eval()
-        pretrained_ni.to(device) 
+        pretrained_ni.to(device)
         datasets[0] = [datasets[0][0], datasets[0][2]]
 
     # # TODO: think in how to consider multiples trained sirens
@@ -224,12 +221,12 @@ if __name__ == "__main__":
     # # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
     # pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
     # pretrained_ni1.eval()
-    # pretrained_ni1.to(device) 
+    # pretrained_ni1.to(device)
 
     # # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
     # #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
-    
+
     # # pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
     # #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
     # # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
@@ -243,7 +240,7 @@ if __name__ == "__main__":
     dataset = SpaceTimePointCloudNI(
         datasets,
         sampling_config["samples_on_surface"],
-        #pretrained_ni=[pretrained_ni1, pretrained_ni2],
+        # pretrained_ni=[pretrained_ni1, pretrained_ni2],
         pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
@@ -292,7 +289,7 @@ if __name__ == "__main__":
     #     mesh_file = f"epoch_{0}_time_{T}.ply"
     #     verts, faces, normals, _ = create_mesh(
     #         model,
-    #         filename=os.path.join(full_path, "reconstructions", mesh_file), 
+    #         filename=os.path.join(full_path, "reconstructions", mesh_file)
     #         t=T,  # time instant for 4d SIREN function
     #         N= parameter_dict["reconstruction"]["resolution"],
     #         device=device

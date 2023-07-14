@@ -132,14 +132,14 @@ def train_model(dataset, model, device, train_config, silent=False):
 
             mesh_file = f"{epoch}.ply"
             mesh_resolution = train_config["mc_resolution"]
-            
+
             N = 5    # number of samples of the interval time
             for i in range(N):
                 T = (-1 + 2*(i/(N-1)))*0.1
                 mesh_file = f"epoch_{epoch}_time_{T}.ply"
                 verts, faces, normals, _ = create_mesh_lipschitz(
                     model,
-                    filename=os.path.join(full_path, "reconstructions", mesh_file), 
+                    filename=os.path.join(full_path, "reconstructions", mesh_file),
                     t=T,  # time instant for 4d SIREN function
                     N=mesh_resolution,
                     device=device
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     #     pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
     #     pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
     #     pretrained_ni.eval()
-    #     pretrained_ni.to(device) 
+    #     pretrained_ni.to(device)
     #     datasets[0] = [datasets[0][0], datasets[0][2]]
 
     # TODO: think in how to consider multiples trained sirens
@@ -274,8 +274,8 @@ if __name__ == "__main__":
     loss = parameter_dict.get("loss")
     if loss is not None and loss:
         if loss == "sitzmann":
-            loss_fn = sdf_sitzmann_time   
-        elif loss == "true_sdf":  
+            loss_fn = sdf_sitzmann_time
+        elif loss == "true_sdf":
             loss_fn = sdf_time
         elif loss == "sdf_boundary_problem":
             loss_fn = sdf_boundary_problem
