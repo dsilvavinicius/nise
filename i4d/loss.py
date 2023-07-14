@@ -2,7 +2,7 @@
 
 import torch
 from torch.functional import F
-from diff_operators import divergence, gradient, mean_curvature, vector_dot
+from i4d.diff_operators import divergence, gradient, mean_curvature, vector_dot
 
 
 def on_surface_sdf_constraint(gt_sdf, pred_sdf):

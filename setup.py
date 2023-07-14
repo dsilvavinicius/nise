@@ -6,8 +6,8 @@ from setuptools import setup
 
 setup(
     name="i4d",
-    version="0.0.1",
-    description="Neural Implicit Surfaces in Higher Dimensions",
+    version="0.0.2",
+    description="Neural Implicit Surface Evolution",
     author="The Deep Implicits Group",
-    packages=["."],
+    packages=["i4d"],
 )

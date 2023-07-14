@@ -6,8 +6,8 @@ import open3d as o3d
 import open3d.core as o3c
 import torch
 from torch.utils.data import Dataset
-from model import SIREN
-from diff_operators import gradient
+from i4d.model import SIREN
+from i4d.diff_operators import gradient
 
 
 def _sample_on_surface(mesh: o3d.t.geometry.TriangleMesh,

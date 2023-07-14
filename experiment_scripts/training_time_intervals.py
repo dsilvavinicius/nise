@@ -13,11 +13,10 @@ from plyfile import PlyData
 import torch
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
-from diff_operators import gradient
-from loss import LossMeanCurvature
-from meshing import create_mesh
-from model import SIREN
-from util import create_output_paths, from_pth, reconstruct_at_times
+from i4d.diff_operators import gradient
+from i4d.loss import LossMeanCurvature
+from i4d.model import SIREN
+from i4d.util import create_output_paths, from_pth, reconstruct_at_times
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):

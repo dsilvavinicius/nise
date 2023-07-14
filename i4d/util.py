@@ -6,8 +6,8 @@ import os.path as osp
 import shutil
 import torch
 from warnings import warn
-from meshing import create_mesh
-from model import SIREN
+from i4d.meshing import create_mesh
+from i4d.model import SIREN
 
 
 def create_output_paths(checkpoint_path, experiment_name, overwrite=True):

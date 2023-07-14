@@ -1,7 +1,6 @@
 '''From the DeepSDF repository https://github.com/facebookresearch/DeepSDF
 '''
 
-import logging
 import numpy as np
 import plyfile
 from skimage.measure import marching_cubes
