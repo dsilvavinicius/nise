@@ -17,7 +17,7 @@ from diff_operators import gradient
 from loss import LossMeanCurvature
 from meshing import create_mesh
 from model import SIREN
-from util import create_output_paths, from_pth
+from util import create_output_paths, from_pth, reconstruct_at_times
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
@@ -296,45 +296,6 @@ def read_ply(path: str, t: float):
     return mesh, torch.from_numpy(vertices).requires_grad_(False)
 
 
-def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
-    """Runs marching cubes on `model` at times `times`.
-
-    Parameters
-    ----------
-    model: torch.nn.Module
-        The model to run the inference. Must accept $\mathbb{R}^4$ inputs.
-
-    times: collection of numbers
-        The timesteps to use as input for `model`. The number of meshes
-        generated will be `len(times)`.
-
-    meshpath: str, PathLike
-        Base folder to save all meshes.
-
-    resolution: int, optional
-        Marching cubes resolution. The input volume will have
-        `resolution` ** 3 voxels. Default value is 256.
-
-    device: str or torch.Device, optional
-        The device where we will run the inference on `model`.
-        Default value is "cpu".
-
-    See Also
-    --------
-    i4d.meshing.create_mesh
-    """
-    model = model.eval()
-    with torch.no_grad():
-        for t in times:
-            verts, faces, normals, _ = create_mesh(
-                model,
-                filename=osp.join(meshpath, f"time_{t}.ply"),
-                t=t,  # time instant for 4d SIREN function
-                N=resolution,
-                device=device
-            )
-
-
 class STPointCloudNI(Dataset):
     """Space-time varying point clouds with NI for SDF querying.
 
@@ -401,28 +362,72 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    SEED = 668123
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    MESH = "bunny"
+    parser = argparse.ArgumentParser(
+        description="Experiments with different time intervals for sampling."
+    )
+    parser.add_argument(
+        "mesh",
+        help="The mesh to use. Must exist both in folders \"ni\" and \"data\"."
+    )
+    parser.add_argument(
+        "omega0", type=float,
+        help="Omega_0 value to use for the pre-trained NI."
+    )
+    parser.add_argument(
+        "--init_method", "-i", default="sitz",
+        help="Initialization method. Either standard (\"sitz\") or ours"
+        " (\"i3d\")."
+    )
+    parser.add_argument(
+        "--seed", default=668123, type=int,
+        help="Seed for the random-number generator."
+    )
+    parser.add_argument(
+        "--device", "-d", default="cuda:0", help="Device to run the training."
+    )
+    parser.add_argument(
+        "--batchsize", "-b", default=20000, type=int,
+        help="Number of points to use per step of training."
+    )
+    parser.add_argument(
+        "--epochs", "-e", default=500, type=int,
+        help="Number of epochs of training to perform."
+    )
+    parser.add_argument(
+        "--timeintervals", "-t", nargs='+', type=float,
+        default=[0.0, 1.0, 0.0, 0.5, 0.0, 0.25, -0.1, 1.0, -0.1, 0.5, -0.1, 0.25,
+                 -0.25, 1.0, -0.25, 0.5, -0.25, 0.25],
+        help="Time intervals to use when sampling points for training."
+    )
+    args = parser.parse_args()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    EPOCHS = 500
-    BATCHSIZE = 20000
-    dataset = STPointCloudNI([(f"data/{MESH}.ply", f"ni/{MESH}.pth", 0, 30)],
-                             BATCHSIZE)
-    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+
+    devstr = args.device
+    if "cuda" in args.device and not torch.cuda.is_available():
+        print(f"[WARNING] Selected device {args.device}, but CUDA is not"
+              " available. Using CPU")
+        devstr = "cpu"
+    device = torch.device(devstr)
+    dataset = STPointCloudNI(
+        [(f"data/{args.mesh}.ply", f"ni/{args.mesh}.pth", 0, args.omega0)],
+        args.batchsize
+    )
+    nsteps = round(args.epochs * (2 * len(dataset) / args.batchsize))
     print(f"Total # of training steps = {nsteps}")
 
-    model = SIREN(4, 1, [256] * 3, w0=30, delay_init=True).to(device)
+    model = SIREN(4, 1, [256] * 3, w0=args.omega0, delay_init=True).to(device)
     print(model)
 
-    TIMES = [[0.0, 1.0], [0.0, 0.5], [0.0, 0.25], [-0.1, 1.0], [-0.1, 0.5],
-            [-0.1, 0.25], [-0.25, 1.0], [-0.25, 0.5], [-0.25, 0.25]]
+    TIMES = []
+    for i in range(1, len(args.timeintervals), 2):
+        TIMES.append((args.timeintervals[i-1], args.timeintervals[i]))
+
     for T in TIMES:
         print(f"=============== t0={T[0]}, t1={T[1]} ===============")
-        EXPERIMENT = f"{MESH}_meancurvature_{EPOCHS}epochs_sitz_init_t{T[0]},{T[1]}"
+        EXPERIMENT = f"{args.mesh}_meancurvature_{args.epochs}epochs_{args.init_method}_init_t{T[0]},{T[1]}"
         WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
         experimentpath = create_output_paths(
             "logs",
@@ -444,13 +449,13 @@ if __name__ == '__main__':
             params=model.parameters()
         )
 
-        trainingpts = torch.zeros((BATCHSIZE, 4), device=device)
-        trainingnormals = torch.zeros((BATCHSIZE, 3), device=device)
-        trainingsdf = torch.zeros((BATCHSIZE), device=device)
+        trainingpts = torch.zeros((args.batchsize, 4), device=device)
+        trainingnormals = torch.zeros((args.batchsize, 3), device=device)
+        trainingsdf = torch.zeros((args.batchsize), device=device)
 
-        n_on_surface = math.ceil(BATCHSIZE * 0.25)
-        n_off_surface = math.floor(BATCHSIZE * 0.25)
-        n_int_times = BATCHSIZE - (n_on_surface + n_off_surface)
+        n_on_surface = math.ceil(args.batchsize * 0.25)
+        n_off_surface = math.floor(args.batchsize * 0.25)
+        n_int_times = args.batchsize - (n_on_surface + n_off_surface)
         training_loss = {}
         lossmeancurv = LossMeanCurvature(scale=0.001)
 

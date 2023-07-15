@@ -15,9 +15,8 @@ from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 from diff_operators import gradient
 from loss import LossMeanCurvature
-from meshing import create_mesh
 from model import SIREN
-from util import create_output_paths, from_pth
+from util import create_output_paths, from_pth, reconstruct_at_times
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
@@ -296,45 +295,6 @@ def read_ply(path: str, t: float):
     return mesh, torch.from_numpy(vertices).requires_grad_(False)
 
 
-def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
-    """Runs marching cubes on `model` at times `times`.
-
-    Parameters
-    ----------
-    model: torch.nn.Module
-        The model to run the inference. Must accept $\mathbb{R}^4$ inputs.
-
-    times: collection of numbers
-        The timesteps to use as input for `model`. The number of meshes
-        generated will be `len(times)`.
-
-    meshpath: str, PathLike
-        Base folder to save all meshes.
-
-    resolution: int, optional
-        Marching cubes resolution. The input volume will have
-        `resolution` ** 3 voxels. Default value is 256.
-
-    device: str or torch.Device, optional
-        The device where we will run the inference on `model`.
-        Default value is "cpu".
-
-    See Also
-    --------
-    i4d.meshing.create_mesh
-    """
-    model = model.eval()
-    with torch.no_grad():
-        for t in times:
-            verts, faces, normals, _ = create_mesh(
-                model,
-                filename=osp.join(meshpath, f"time_{t}.ply"),
-                t=t,  # time instant for 4d SIREN function
-                N=resolution,
-                device=device
-            )
-
-
 class STPointCloudNI(Dataset):
     """Space-time varying point clouds with NI for SDF querying.
 
@@ -409,7 +369,8 @@ if __name__ == '__main__':
         help="The mesh to use. Must exist both in folders \"ni\" and \"data\"."
     )
     parser.add_argument(
-        "omega0", help="Omega_0 value to use for the pre-trained NI."
+        "omega0", type=float,
+        help="Omega_0 value to use for the pre-trained NI."
     )
     parser.add_argument(
         "--init_method", "-i", default="sitz",
@@ -417,19 +378,24 @@ if __name__ == '__main__':
         " (\"i3d\")."
     )
     parser.add_argument(
-        "--seed", "-s", default=668123,
+        "--seed", default=668123, type=int,
         help="Seed for the random-number generator."
     )
     parser.add_argument(
         "--device", "-d", default="cuda:0", help="Device to run the training."
     )
     parser.add_argument(
-        "--batchsize", "-b", default=20000,
+        "--batchsize", "-b", default=20000, type=int,
         help="Number of points to use per step of training."
     )
     parser.add_argument(
-        "--epochs", "-e", default=500,
+        "--epochs", "-e", default=500, type=int,
         help="Number of epochs of training to perform."
+    )
+    parser.add_argument(
+        "--scales", "-s", nargs='+', default=[1e-3, 1e-2, 1e-1], type=float,
+        help="The mean-curvature-equation scale values to use. Each value will"
+        " be used to train one neural implicit representation."
     )
     args = parser.parse_args()
 
@@ -454,8 +420,7 @@ if __name__ == '__main__':
     model = SIREN(4, 1, [256] * 3, w0=args.omega0, delay_init=True).to(device)
     print(model)
 
-    SCALES = [0.001, 0.002, 0.003, 0.004, 0.005, 0.01, 0.1]
-    for S in SCALES:
+    for S in args.scales:
         print(f"=============== S={S} ===============")
         EXPERIMENT = f"{args.mesh}_meancurvature_{args.epochs}epochs_{args.init_method}_init_s{S}"
         WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
