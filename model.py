@@ -115,9 +115,15 @@ class SIREN(nn.Module):
             Dictionary of tensors with the input coordinates under 'model_in'
             and the model output under 'model_out'.
         """
+        #GAMBIARRA
+        if x.shape[-1]==4:
+            x[...,3] = 10*x[...,3]/self.w0
+        
         # Enables us to compute gradients w.r.t. coordinates
         coords_org = x.clone().detach().requires_grad_(True)
         coords = coords_org
+        
+        
         y = self.net(coords)
         return {"model_in": coords_org, "model_out": y}
 

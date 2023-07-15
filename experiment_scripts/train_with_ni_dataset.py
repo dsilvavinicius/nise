@@ -16,9 +16,9 @@ from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 from diff_operators import gradient
 from loss import LossMeanCurvature
-from meshing import create_mesh
+# from meshing import create_mesh
 from model import SIREN
-from util import create_output_paths, from_pth, reconstruct_at_times
+from util import create_output_paths, from_pth, reconstruct_at_times, reconstruct_with_curvatures
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
@@ -367,24 +367,60 @@ if __name__ == '__main__':
     np.random.seed(SEED)
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
-    MESH = "falcon"
-    NI = "ni/falcon_smooth_2x128_w0-20.pth"
+    # MESH = "falcon_smooth"
+    # MESH = "bob"
+    # MESH = "spot"
+    # MESH = "neptune"
+    # MESH = "max"
+    #MESH = "witch"
+    MESH = "armadillo"
+    
+    # NI = "shapeNets/falcon_smooth_2x128_w0-20.pth"
+    #NI = "shapeNets/witch_2x128_w0-30.pth"
+    
+    # NI = "shapeNets/bob_1x64_w0-16.pth"
+            # NI = "shapeNets/spot_1x64_w0-16.pth"
+    
+    # NI = "shapeNets/neptune.pth"
+    # NI = "shapeNets/max.pth"
+    #NI = "shapeNets/armadillo_2x256_w-60.pth"
+    NI = "shapeNets/armadillo-2x128_w0-30.pth"
+    
     # NI = f"ni/{MESH}"
-    W0 = 20
+    
+    # W0 = 20 #falcon_smooth
+    #W0 = 30 #witch
+    # W0 = 16 #bob, bob
+    # W0 = 40 #neptune
+    # W0 = 60 #max
+    W0 = 30 #armadillo
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    EPOCHS = 500
-    BATCHSIZE = 30000
+    EPOCHS = 10000
+    # BATCHSIZE = 20000 #falcon_smooth, bob
+    # BATCHSIZE = 10000 #spot 
+    # BATCHSIZE = 60000 #neptune 
+    BATCHSIZE = 20000 #max
     dataset = STPointCloudNI(
-        [(f"data/{MESH}_sub.ply", NI, 0, W0)],
+        # [(f"data/{MESH}.ply", NI, 0, W0)],
+        # [(f"data/{MESH}.ply", NI, -1.0, W0)],
+        [(f"data/{MESH}.ply", NI, -1.0, 30)],
         BATCHSIZE
     )
-    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
+
+    nsteps = 1000#round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
     WARMUP_STEPS = nsteps // 10
-    CHECKPOINT_AT = nsteps // 10
+    CHECKPOINT_AT = 1000
     print(f"Total # of training steps = {nsteps}")
 
-    model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)
+    # model = SIREN(4, 1, [128] * 3, w0=W0, delay_init=True).to(device)#max
+    # model = SIREN(4, 1, [64] * 2, w0=W0, delay_init=False).to(device)#max coarse
+    # model = SIREN(4, 1, [160] * 3, w0=W0, delay_init=True).to(device)#falcon_smooth
+    # model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=False).to(device)#witch
+    model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)#armadillo
+    # model = SIREN(4, 1, [96] * 2, w0=W0, delay_init=True).to(device)#bob, spot
+    # model = SIREN(4, 1, [300] * 3, w0=W0, delay_init=True).to(device)#neptune
+    # model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)#falcon_smooth
     print(model)
     EXPERIMENT = f"{MESH}_meancurvature_{EPOCHS}epochs_i3dinit_smooth"
     WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
@@ -400,9 +436,14 @@ if __name__ == '__main__':
     writer = SummaryWriter(summarypath)
 
     model.zero_grad(set_to_none=True)
-    # model.reset_weights()
+    model.reset_weights()
     model.from_pretrained_initial_condition(torch.load(NI))
-    dataset.time_sampler = torch.distributions.uniform.Uniform(-0.05, 1.0)
+    
+    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.5, 1.0)#max
+    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.1, 1.0)#falcon_smooth
+    # dataset.time_sampler = torch.distributions.uniform.Uniform(-1.0, 1.0)#armadillo_smooth
+    dataset.time_sampler = torch.distributions.uniform.Uniform(-1, 1)#armadillo_smooth
+    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.05, 1.0)#neptune
 
     optim = torch.optim.Adam(
         lr=1e-4,
@@ -417,7 +458,15 @@ if __name__ == '__main__':
     n_off_surface = math.floor(BATCHSIZE * 0.25)
     n_int_times = BATCHSIZE - (n_on_surface + n_off_surface)
     training_loss = {}
-    lossmeancurv = LossMeanCurvature(scale=2e-3)
+    # lossmeancurv = LossMeanCurvature(scale=2e-3)#max
+    # lossmeancurv = LossMeanCurvature(scale=1e-3)#falcon_smooth
+    lossmeancurv = LossMeanCurvature(scale=1e-3)#falcon_smooth
+    
+    # shapeNet = from_pth(NI, device=device, w0=60).to(device)
+
+    # lossmeancurv = LossMeanCurvature(scale=1e-2)#bob
+    # lossmeancurv = LossMeanCurvature(scale=5e-3)#spot
+    # lossmeancurv = LossMeanCurvature(scale=2e-4)#neptune
 
     best_loss = torch.inf
     best_weigths = None
@@ -458,33 +507,37 @@ if __name__ == '__main__':
 
         running_loss.backward()
         optim.step()
-        writer.add_scalar("train/loss", running_loss.detach().item(), e)
+        # writer.add_scalar("train/loss", running_loss.detach().item(), e)
 
-        if e > WARMUP_STEPS and best_loss > running_loss.item():
-            best_weights = copy.deepcopy(model.state_dict())
-            best_loss = running_loss.item()
+        # if e > WARMUP_STEPS and best_loss > running_loss.item():
+        #     best_weights = copy.deepcopy(model.state_dict())
+        #     best_loss = running_loss.item()
 
-        if e and not e % CHECKPOINT_AT:
-            times = [-0.05, 0.0, 0.5, 0.95]
-            meshpath = osp.join(experimentpath, f"reconstructions_check_{e}")
-            os.makedirs(meshpath)
-            reconstruct_at_times(model, times, meshpath, device=device)
+        # if e and not e % CHECKPOINT_AT:
+        #     times = [-1., -0.5, 0.0, 0.9]
+        #     # times = [-0, -0.1, 0.0, 0.1, 0.2]
+        #     meshpath = osp.join(experimentpath, f"reconstructions_check_{e}")
+        #     os.makedirs(meshpath, exist_ok=True)
+        #     reconstruct_with_curvatures(model, times, meshpath, device=device, resolution=256)
+        #     model = model.train()
 
-        if not e % 100 and e > 0:
-            print(f"Step {e} --- Loss {running_loss.item()}")
+        # if not e % 100 and e > 0:
+        #     print(f"Step {e} --- Loss {running_loss.item()}")
 
     training_time = time.time() - start_training_time
     print(f"training took {training_time} s")
+    writer.flush()
+    writer.close()
 
     torch.save(model.state_dict(), osp.join(experimentpath, "models", "weights.pth"))
     torch.save(
         best_weights, osp.join(experimentpath, "models", "best.pth")
     )
     model.load_state_dict(best_weights)
-    loss_df = pd.DataFrame.from_dict(training_loss)
-    loss_df.to_csv(osp.join(experimentpath, "loss.csv"), sep=';', index=None)
+    #loss_df = pd.DataFrame.from_dict(training_loss)
+    #loss_df.to_csv(osp.join(experimentpath, "loss.csv"), sep=';', index=None)
 
     # model.load_state_dict(best_weights)
-    times = [-0.05, 0.0, 0.5, 0.95]
+    times = [-1., 0.0, 0.5 , 1.]
     meshpath = osp.join(experimentpath, "reconstructions")
-    reconstruct_at_times(model, times, meshpath, device=device, resolution=400)
+    reconstruct_with_curvatures(model, times, meshpath, device=device, resolution=512)
