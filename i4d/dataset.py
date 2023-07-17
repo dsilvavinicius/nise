@@ -795,8 +795,6 @@ if __name__ == "__main__":
     X = data["coords"]
     gt = {k: v for k, v in data.items() if k != "coords"}
 
-    from model import SIREN
-
     device = torch.device("cuda:0")
     bunny_ni = SIREN(3, 1, [256] * 3, w0=30).eval().to(device)
     bunny_ni.load_state_dict(torch.load("ni/bunny_2x256_w-30.pth"))
