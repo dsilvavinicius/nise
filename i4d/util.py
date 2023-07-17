@@ -1,9 +1,12 @@
 # coding: utf-8
 
+from collections import OrderedDict
 import json
+import math
 import os
 import os.path as osp
 import shutil
+import numpy as np
 import torch
 from warnings import warn
 from i4d.meshing import create_mesh
@@ -181,3 +184,41 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
                 N=resolution,
                 device=device
             )
+
+
+def reconstruct_with_curvatures(model, times, meshpath, resolution=256, device="cpu"):
+    attrs = [("nx", "f4"), ("ny", "f4"), ("nz", "f4"), ("quality", "f4")]
+    BATCH_SIZE = 10000
+    # attrs = [("quality", "f4")]
+    model = model.eval()
+    for t in times:
+        verts, faces, normals, _ = create_mesh(
+            model,
+            # filename=osp.join(meshpath, f"time_{t}.ply"),
+            t=t,  # time instant for 4d SIREN function
+            N=resolution,
+            device=device
+        )
+
+        verts = torch.from_numpy(verts)
+        coords = torch.cat((verts, t*torch.ones_like(verts[...,-1:])), dim=1).squeeze(0).to(device)
+        nsteps = int(math.ceil(verts.shape[0] / BATCH_SIZE))
+        grads = torch.zeros_like(coords)
+        curvs = torch.zeros((grads.shape[0], 1))
+        for s in range(nsteps):
+            a = s*BATCH_SIZE
+            b = (s+1)*BATCH_SIZE
+            out = model(coords[a:b, ...].unsqueeze(0).float())
+            X = out['model_in']
+            y = out['model_out']
+            g = gradient(y, X)
+            c = mean_curvature(g, X)
+            grads[a:b, ...] = g.detach().squeeze(0)
+            curvs[a:b, ...] = c.detach().squeeze(0)
+
+        verts = np.hstack((verts.cpu().numpy(), grads[...,0:3].cpu().numpy(), curvs.cpu().numpy()))
+        save_ply(
+            verts=verts, faces=faces,
+            filename=osp.join(meshpath, f"time_{t}_meancurv.ply"),
+            vertex_attributes=attrs
+        )
