@@ -9,7 +9,8 @@ import shutil
 import numpy as np
 import torch
 from warnings import warn
-from i4d.meshing import create_mesh
+from i4d.diff_operators import gradient, mean_curvature
+from i4d.meshing import create_mesh, save_ply
 from i4d.model import SIREN
 
 

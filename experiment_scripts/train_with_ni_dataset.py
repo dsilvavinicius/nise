@@ -17,7 +17,8 @@ from torch.utils.tensorboard import SummaryWriter
 from i4d.diff_operators import gradient
 from i4d.loss import LossMeanCurvature
 from i4d.model import SIREN
-from i4d.util import create_output_paths, from_pth, reconstruct_at_times
+from i4d.util import (create_output_paths, from_pth, reconstruct_at_times,
+                      reconstruct_with_curvatures)
 
 
 def sample_on_surface(vertices: torch.Tensor, n_points: int, device: str):
