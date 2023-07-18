@@ -9,8 +9,8 @@ and a set of checkpoints.
 import argparse
 import os
 import os.path as osp
-from meshing import create_mesh
-from util import from_pth, reconstruct_at_times
+import torch
+from i4d.util import from_pth, reconstruct_at_times
 
 
 if __name__ == "__main__":
@@ -43,17 +43,13 @@ if __name__ == "__main__":
     if out_dir and not osp.exists(out_dir):
         os.makedirs(out_dir)
 
-    model = from_pth(args.model_path, w0=args.w0, device="cuda:0").eval().to("cuda:0")
+    devstr = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = torch.device(devstr)
+
+    model = from_pth(args.model_path, w0=args.w0, device=device).eval().to(device)
     print(model)
     print(f"Running marching cubes running with resolution {args.resolution}")
 
-    times = [-0.4, 0.0, 0.5]
-    reconstruct_at_times(model, times, out_dir, device="cuda:0")
-
-    # create_mesh(
-    #     model,
-    #     args.output_path,
-    #     N=args.resolution
-    # )
+    reconstruct_at_times(model, args.times, out_dir, device=device)
 
     print("Done")
