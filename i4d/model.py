@@ -54,7 +54,7 @@ class SIREN(nn.Module):
 
     w0: number, optional
         Frequency multiplier for the Sine layers. Only useful for training the
-        model. Default value is 30, as per [1].
+        model. Default value is 1.
 
     ww: number, optional
         Frequency multiplier for the hidden Sine layers. Only useful for
@@ -74,7 +74,7 @@ class SIREN(nn.Module):
     Activation Functions. ArXiv. http://arxiv.org/abs/2006.09661
     """
     def __init__(self, n_in_features, n_out_features, hidden_layer_config=[],
-                 w0=30, ww=None, delay_init=False):
+                 w0=1, ww=None, delay_init=False):
         super(SIREN, self).__init__()
         self.in_features = n_in_features
         self.out_features = n_out_features
@@ -125,6 +125,8 @@ class SIREN(nn.Module):
         """
         if omegas:
             for k, v in omegas.items():
+                if k < 0 or k > x.shape[1]:
+                    continue
                 x[..., k] = v * x[..., k] / self.w0
 
         # Enables us to compute gradients w.r.t. coordinates
@@ -139,7 +141,7 @@ class SIREN(nn.Module):
 
         Returns
         -------
-        self: nifm.model.SIREN
+        self: i4d.model.SIREN
             The network.
         """
         self.net[0].apply(first_layer_sine_init)

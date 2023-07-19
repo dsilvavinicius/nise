@@ -424,9 +424,9 @@ if __name__ == '__main__':
 
     MESH = list(training_mesh_config.keys())[0]
     NI = training_mesh_config[MESH]["ni"]
-    W0 = training_mesh_config[MESH]["omega_0"]
+    W0 = training_mesh_config[MESH].get("omega_0", 1)
 
-    EPOCHS = training_config["n_epochs"]
+    EPOCHS = training_config.get("n_epochs", 100)
     if args.epochs:
         EPOCHS = args.epochs
 
@@ -442,12 +442,11 @@ if __name__ == '__main__':
     print(f"Total # of training steps = {nsteps}")
 
     network_config = config["network"]
-    model = SIREN(4, 1, network_config["hidden_layer_nodes"], w0=W0,
-                  delay_init=True).to(device)
+    model = SIREN(4, 1, network_config["hidden_layer_nodes"],
+                  w0=network_config["omega_0"], delay_init=True).to(device)
     print(model)
 
     experiment = osp.split(args.experiment_config)[-1].split('.')[0]
-    WEIGHTSPATH = osp.join("logs", experiment, "models", "weights.pth")
     experimentpath = create_output_paths(
         "results",
         experiment,
@@ -458,9 +457,14 @@ if __name__ == '__main__':
 
     model.zero_grad(set_to_none=True)
     model.reset_weights()
-    model.from_pretrained_initial_condition(torch.load(NI))
+    init_method = network_config["init_method"]
+    if args.init_method:
+        init_method = args.init_method
 
-    timerange = training_mesh_config[MESH]["timesampler"]["range"]
+    if init_method == "i3d":
+        model.from_pretrained_initial_condition(torch.load(NI))
+
+    timerange = training_mesh_config[MESH]["timesampler"].get("range", [-1.0, 1.0])
     dataset.time_sampler = torch.distributions.uniform.Uniform(
         timerange[0], timerange[1]
     )
@@ -483,7 +487,7 @@ if __name__ == '__main__':
 
     best_loss = torch.inf
     best_weigths = None
-    omegas = {3: 10}  # Setting the omega_0 value of t to 10
+    omegas = {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     start_training_time = time.time()
     for e in range(nsteps):
         data = dataset[e]
@@ -529,7 +533,6 @@ if __name__ == '__main__':
 
             if CHECKPOINT_AT and e and not e % CHECKPOINT_AT:
                 times = [-1., -0.5, 0.0, 0.9]
-                # times = [-0, -0.1, 0.0, 0.1, 0.2]
                 meshpath = osp.join(experimentpath, "reconstructions", f"check_{e}")
                 os.makedirs(meshpath, exist_ok=True)
                 reconstruct_with_curvatures(
