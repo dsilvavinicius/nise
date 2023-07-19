@@ -1,6 +1,7 @@
 # coding: utf-8
 
 from collections import OrderedDict
+import os.path as osp
 import torch
 from torch import nn
 import numpy as np
@@ -74,7 +75,9 @@ class SIREN(nn.Module):
     """
     def __init__(self, n_in_features, n_out_features, hidden_layer_config=[],
                  w0=30, ww=None, delay_init=False):
-        super().__init__()
+        super(SIREN, self).__init__()
+        self.in_features = n_in_features
+        self.out_features = n_out_features
         self.w0 = w0
         if ww is None:
             self.ww = w0
@@ -101,7 +104,7 @@ class SIREN(nn.Module):
         if not delay_init:
             self.reset_weights()
 
-    def forward(self, x):
+    def forward(self, x, omegas=dict()):
         """Forward pass of the model.
 
         Parameters
@@ -109,27 +112,72 @@ class SIREN(nn.Module):
         x: torch.Tensor
             The model input containing of size Nx3
 
+        omegas: dict[int=>float]
+            The omega values to apply to the input. Must be a dict with the
+             coordinate index as key, and new omega value for said coordinate
+             as value.
+
         Returns
         -------
         dict
             Dictionary of tensors with the input coordinates under 'model_in'
             and the model output under 'model_out'.
         """
-        #GAMBIARRA
-        if x.shape[-1]==4:
-            x[...,3] = 10*x[...,3]/self.w0
-        
+        if omegas:
+            for k, v in omegas.items():
+                x[..., k] = v * x[..., k] / self.w0
+
         # Enables us to compute gradients w.r.t. coordinates
         coords_org = x.clone().detach().requires_grad_(True)
         coords = coords_org
-        
-        
+
         y = self.net(coords)
         return {"model_in": coords_org, "model_out": y}
 
     def reset_weights(self):
+        """Resets the weights of the network using Sitzmann et al. (2020).
+
+        Returns
+        -------
+        self: nifm.model.SIREN
+            The network.
+        """
         self.net[0].apply(first_layer_sine_init)
         self.net[1:].apply(lambda module: sine_init(module, self.ww))
+
+    def update_omegas(self, w0=1, ww=None):
+        """Updates the omega values for all layers except the last one.
+
+        Note that this updates the w0 and ww instance attributes.
+
+        Parameters
+        ----------
+        w0: number, optional
+            The new omega_0 value to assume. By default is 1.
+
+        ww: number, optional
+            The new omega_w value to assume. By default is None, meaning
+            that `ww` wil be set to `w0`.
+        """
+        if ww is None:
+            ww = w0
+
+        # Updating the state_dict weights and biases.
+        my_sd = self.state_dict()
+        keys = list(my_sd.keys())
+        for k in keys[:-2]:
+            my_sd[k] = my_sd[k] * (self.w0 / w0)
+
+        self.load_state_dict(my_sd)
+        self.w0 = w0
+        self.ww = ww
+
+        # Updating the omega values of the SineLayer instances
+        self.net[0][1].w0 = w0
+        for i in range(1, len(self.net)-1):
+            self.net[i][1].w0 = ww
+
+        return self
 
     def from_pretrained_initial_condition(self, other: OrderedDict):
         """Neural network initialization given a pretrained network.
