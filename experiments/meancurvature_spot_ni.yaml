@@ -12,9 +12,9 @@ loss:
   scale: 5e-3
 
 training_data:
-  batchsize: 20000
-  n_on_surface: 5000
-  n_off_surface: 5000
+  batchsize: 10000
+  n_on_surface: 2500
+  n_off_surface: 2500
   mesh:
     data/spot.ply:
       ni: ni/spot_1x64_w0-16.pth
