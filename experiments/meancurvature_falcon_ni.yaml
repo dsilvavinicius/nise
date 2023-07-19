@@ -1,0 +1,24 @@
+network:
+  omega_0: 30
+  hidden_layer_nodes: [256, 256, 256]
+  init_method: i3d
+
+training:
+  n_epochs: 1001
+  checkpoints_at_every_epoch: 1002
+
+loss:
+  type: meancurvature
+  scale: 1e-3
+
+training_data:
+  batchsize: 20000
+  n_on_surface: 5000
+  n_off_surface: 5000
+  mesh:
+    data/falcon_smooth.ply:
+      ni: ni/falcon_smooth_2x128_w0-20.pth
+      omega_0: 20
+      t: -1
+      timesampler:
+        range: [-0.1, 1.0]

@@ -1,0 +1,24 @@
+network:
+  omega_0: 60
+  hidden_layer_nodes: [128, 128, 128]
+  init_method: i3d
+
+training:
+  n_epochs: 1001
+  checkpoints_at_every_epoch: 1002
+
+loss:
+  type: meancurvature
+  scale: 2e-3
+
+training_data:
+  batchsize: 20000
+  n_on_surface: 5000
+  n_off_surface: 5000
+  mesh:
+    data/max.ply:
+      ni: ni/max.pth
+      omega_0: 30
+      t: -1
+      timesampler:
+        range: [-0.5, 1.0]
