@@ -6,18 +6,19 @@ import math
 import os
 import os.path as osp
 import time
+import sys
 import numpy as np
 import open3d as o3d
 import open3d.core as o3c
-import pandas as pd
 from plyfile import PlyData
 import torch
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
+import yaml
 from i4d.diff_operators import gradient
 from i4d.loss import LossMeanCurvature
 from i4d.model import SIREN
-from i4d.util import (create_output_paths, from_pth, reconstruct_at_times,
+from i4d.util import (create_output_paths, from_pth,
                       reconstruct_with_curvatures)
 
 
@@ -258,7 +259,8 @@ def read_ply(path: str, t: float):
     -------
     mesh: o3d.t.geometry.TriangleMesh
         The fully constructed Open3D Triangle Mesh. By default, the mesh is
-        allocated on the CPU:0 device.
+        allocated on the CPU:0 device, since Open3D still doesn't support GPU
+        nearest-neighbor operations.
 
     vertices: torch.tensor
         The same vertex information as stored in `mesh`, augmented by the SDF
@@ -269,7 +271,7 @@ def read_ply(path: str, t: float):
     --------
     PlyData.read, o3d.t.geometry.TriangleMesh
     """
-    # Reading the PLY file with curvature info
+    # Reading the PLY file and adding the time info
     n_columns = 8  # x, y, z, t, nx, ny, nz, sdf
     with open(path, "rb") as f:
         plydata = PlyData.read(f)
@@ -302,10 +304,10 @@ class STPointCloudNI(Dataset):
 
     Parameters
     ----------
-    inputpaths: list[str, str, number, number]
-        List with paths to the base meshes (PLY format only), their neural
-        implicit representations, the parameter value (-1 <= t <= 1) for
-        each mesh, and omega_0 value for the NI.
+    inputpaths: list[(str, str, number, number)]
+        List of tuples with paths to the base meshes (PLY format only), their
+        neural implicit (NI) representations, the parameter value
+        (-1 <= t <= 1) for each mesh, and omega_0 value for the NI.
 
     batchsize: int
         # of points to sample at each call to `__getitem__`.
@@ -363,87 +365,105 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    SEED = 668123
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    # MESH = "falcon_smooth"
-    # MESH = "bob"
-    # MESH = "spot"
-    # MESH = "neptune"
-    # MESH = "max"
-    #MESH = "witch"
-    MESH = "armadillo"
+    parser = argparse.ArgumentParser(
+        description="Default training script when using Neural Implicits for"
+        " SDF querying. Note that command line arguments have precedence over"
+        " configuration file values."
+    )
+    parser.add_argument(
+        "experiment_config", type=str, help="Path to the YAML experiment"
+        " configuration file."
+    )
+    parser.add_argument(
+        "--init_method", "-i", default="",
+        help="Initialization method. Either standard (\"sitz\") or ours"
+        " (\"i3d\"). If left empty, fetches it from the configuration file."
+    )
+    parser.add_argument(
+        "--seed", default=668123, type=int,
+        help="Seed for the random-number generator."
+    )
+    parser.add_argument(
+        "--device", "-d", default="cuda:0", help="Device to run the training."
+    )
+    parser.add_argument(
+        "--batchsize", "-b", default=0, type=int,
+        help="Number of points to use per step of training. If set to 0,"
+        " fetches it from the configuration file."
+    )
+    parser.add_argument(
+        "--epochs", "-e", default=0, type=int,
+        help="Number of epochs of training to perform. If set to 0, fetches it"
+        " from the configuration file."
+    )
+    parser.add_argument(
+        "--time_benchmark", "-t", action="store_true", help="Indicates that we"
+        " are running a training time measurement. Disables writing to"
+        " tensorboard, model checkpoints, best model serialization and mesh"
+        " generation during training."
+    )
+    args = parser.parse_args()
 
-    # NI = "shapeNets/falcon_smooth_2x128_w0-20.pth"
-    #NI = "shapeNets/witch_2x128_w0-30.pth"
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
-    # NI = "shapeNets/bob_1x64_w0-16.pth"
-            # NI = "shapeNets/spot_1x64_w0-16.pth"
+    with open(args.experiment_config, 'r') as f:
+        config = yaml.safe_load(f)
 
-    # NI = "shapeNets/neptune.pth"
-    # NI = "shapeNets/max.pth"
-    #NI = "shapeNets/armadillo_2x256_w-60.pth"
-    NI = "shapeNets/armadillo-2x128_w0-30.pth"
+    devstr = args.device
+    if "cuda" in args.device and not torch.cuda.is_available():
+        print(f"[WARNING] Selected device {args.device}, but CUDA is not"
+              " available. Using CPU", file=sys.stderr)
+        devstr = "cpu"
+    device = torch.device(devstr)
 
-    # NI = f"ni/{MESH}"
+    training_config = config["training"]
+    training_data_config = config["training_data"]
+    training_mesh_config = training_data_config["mesh"]
 
-    # W0 = 20 #falcon_smooth
-    #W0 = 30 #witch
-    # W0 = 16 #bob, bob
-    # W0 = 40 #neptune
-    # W0 = 60 #max
-    W0 = 30 #armadillo
+    MESH = list(training_mesh_config.keys())[0]
+    NI = training_mesh_config[MESH]["ni"]
+    W0 = training_mesh_config[MESH]["omega_0"]
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    EPOCHS = 10000
-    # BATCHSIZE = 20000 #falcon_smooth, bob
-    # BATCHSIZE = 10000 #spot
-    # BATCHSIZE = 60000 #neptune
-    BATCHSIZE = 20000 #max
+    EPOCHS = training_config["n_epochs"]
+    if args.epochs:
+        EPOCHS = args.epochs
+
+    BATCHSIZE = training_data_config["batchsize"]
     dataset = STPointCloudNI(
-        # [(f"data/{MESH}.ply", NI, 0, W0)],
-        # [(f"data/{MESH}.ply", NI, -1.0, W0)],
-        [(f"data/{MESH}.ply", NI, -1.0, 30)],
+        [(MESH, NI, training_mesh_config[MESH]['t'], W0)],
         BATCHSIZE
     )
 
-    nsteps = 1000#round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
+    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
     WARMUP_STEPS = nsteps // 10
-    CHECKPOINT_AT = 1000
+    CHECKPOINT_AT = 0
     print(f"Total # of training steps = {nsteps}")
 
-    # model = SIREN(4, 1, [128] * 3, w0=W0, delay_init=True).to(device)#max
-    # model = SIREN(4, 1, [64] * 2, w0=W0, delay_init=False).to(device)#max coarse
-    # model = SIREN(4, 1, [160] * 3, w0=W0, delay_init=True).to(device)#falcon_smooth
-    # model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=False).to(device)#witch
-    model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)#armadillo
-    # model = SIREN(4, 1, [96] * 2, w0=W0, delay_init=True).to(device)#bob, spot
-    # model = SIREN(4, 1, [300] * 3, w0=W0, delay_init=True).to(device)#neptune
-    # model = SIREN(4, 1, [256] * 3, w0=W0, delay_init=True).to(device)#falcon_smooth
+    network_config = config["network"]
+    model = SIREN(4, 1, network_config["hidden_layer_nodes"], w0=W0,
+                  delay_init=True).to(device)
     print(model)
-    EXPERIMENT = f"{MESH}_meancurvature_{EPOCHS}epochs_i3dinit_smooth"
-    WEIGHTSPATH = osp.join("logs", EXPERIMENT, "models", "weights.pth")
+
+    experiment = osp.split(args.experiment_config)[-1].split('.')[0]
+    WEIGHTSPATH = osp.join("logs", experiment, "models", "weights.pth")
     experimentpath = create_output_paths(
-        "logs",
-        EXPERIMENT,
+        "results",
+        experiment,
         overwrite=False
     )
 
-    summarypath = osp.join(experimentpath, 'summaries')
-    if not osp.exists(summarypath):
-        os.makedirs(summarypath)
-    writer = SummaryWriter(summarypath)
+    writer = SummaryWriter(osp.join(experimentpath, 'summaries'))
 
     model.zero_grad(set_to_none=True)
     model.reset_weights()
     model.from_pretrained_initial_condition(torch.load(NI))
 
-    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.5, 1.0)#max
-    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.1, 1.0)#falcon_smooth
-    # dataset.time_sampler = torch.distributions.uniform.Uniform(-1.0, 1.0)#armadillo_smooth
-    dataset.time_sampler = torch.distributions.uniform.Uniform(-1, 1)#armadillo_smooth
-    # dataset.time_sampler = torch.distributions.uniform.Uniform(-0.05, 1.0)#neptune
+    timerange = training_mesh_config[MESH]["timesampler"]["range"]
+    dataset.time_sampler = torch.distributions.uniform.Uniform(
+        timerange[0], timerange[1]
+    )
 
     optim = torch.optim.Adam(
         lr=1e-4,
@@ -454,23 +474,16 @@ if __name__ == '__main__':
     trainingnormals = torch.zeros((BATCHSIZE, 3), device=device)
     trainingsdf = torch.zeros((BATCHSIZE), device=device)
 
-    n_on_surface = math.ceil(BATCHSIZE * 0.25)
-    n_off_surface = math.floor(BATCHSIZE * 0.25)
-    n_int_times = BATCHSIZE - (n_on_surface + n_off_surface)
+    n_on_surface = config["training_data"].get("n_on_surface", math.ceil(BATCHSIZE * 0.25))
+    n_off_surface = config["training_data"].get("n_off_surface", math.ceil(BATCHSIZE * 0.25))
+    n_int_times = config["training_data"].get("n_int_times", BATCHSIZE - (n_on_surface + n_off_surface))
     training_loss = {}
-    # lossmeancurv = LossMeanCurvature(scale=2e-3)#max
-    # lossmeancurv = LossMeanCurvature(scale=1e-3)#falcon_smooth
-    lossmeancurv = LossMeanCurvature(scale=1e-3)#falcon_smooth
-
-    # shapeNet = from_pth(NI, device=device, w0=60).to(device)
-
-    # lossmeancurv = LossMeanCurvature(scale=1e-2)#bob
-    # lossmeancurv = LossMeanCurvature(scale=5e-3)#spot
-    # lossmeancurv = LossMeanCurvature(scale=2e-4)#neptune
+    scale = float(config["loss"].get("scale", 1e-3))
+    lossmeancurv = LossMeanCurvature(scale=scale)
 
     best_loss = torch.inf
     best_weigths = None
-
+    omegas = {3: 10}  # Setting the omega_0 value of t to 10
     start_training_time = time.time()
     for e in range(nsteps):
         data = dataset[e]
@@ -493,7 +506,7 @@ if __name__ == '__main__':
         }
 
         optim.zero_grad(set_to_none=True)
-        y = model(trainingpts)
+        y = model(trainingpts, omegas=omegas)
         loss = lossmeancurv(y, gt)
 
         running_loss = torch.zeros((1, 1), device=device)
@@ -507,22 +520,25 @@ if __name__ == '__main__':
 
         running_loss.backward()
         optim.step()
-        # writer.add_scalar("train/loss", running_loss.detach().item(), e)
+        if not args.time_benchmark:
+            writer.add_scalar("train/loss", running_loss.detach().item(), e)
 
-        # if e > WARMUP_STEPS and best_loss > running_loss.item():
-        #     best_weights = copy.deepcopy(model.state_dict())
-        #     best_loss = running_loss.item()
+            if e > WARMUP_STEPS and best_loss > running_loss.item():
+                best_weights = copy.deepcopy(model.state_dict())
+                best_loss = running_loss.item()
 
-        # if e and not e % CHECKPOINT_AT:
-        #     times = [-1., -0.5, 0.0, 0.9]
-        #     # times = [-0, -0.1, 0.0, 0.1, 0.2]
-        #     meshpath = osp.join(experimentpath, f"reconstructions_check_{e}")
-        #     os.makedirs(meshpath, exist_ok=True)
-        #     reconstruct_with_curvatures(model, times, meshpath, device=device, resolution=256)
-        #     model = model.train()
+            if CHECKPOINT_AT and e and not e % CHECKPOINT_AT:
+                times = [-1., -0.5, 0.0, 0.9]
+                # times = [-0, -0.1, 0.0, 0.1, 0.2]
+                meshpath = osp.join(experimentpath, "reconstructions", f"check_{e}")
+                os.makedirs(meshpath, exist_ok=True)
+                reconstruct_with_curvatures(
+                    model, times, meshpath, device=device, resolution=256
+                )
+                model = model.train()
 
-        # if not e % 100 and e > 0:
-        #     print(f"Step {e} --- Loss {running_loss.item()}")
+            if not e % 100 and e > 0:
+                print(f"Step {e} --- Loss {running_loss.item()}")
 
     training_time = time.time() - start_training_time
     print(f"training took {training_time} s")
@@ -530,14 +546,8 @@ if __name__ == '__main__':
     writer.close()
 
     torch.save(model.state_dict(), osp.join(experimentpath, "models", "weights.pth"))
-    torch.save(
-        best_weights, osp.join(experimentpath, "models", "best.pth")
-    )
     model.load_state_dict(best_weights)
-    #loss_df = pd.DataFrame.from_dict(training_loss)
-    #loss_df.to_csv(osp.join(experimentpath, "loss.csv"), sep=';', index=None)
-
-    # model.load_state_dict(best_weights)
-    times = [-1., 0.0, 0.5 , 1.]
-    meshpath = osp.join(experimentpath, "reconstructions")
-    reconstruct_with_curvatures(model, times, meshpath, device=device, resolution=512)
+    model.update_omegas(w0=1)
+    torch.save(
+        model.state_dict(), osp.join(experimentpath, "models", "best.pth")
+    )
