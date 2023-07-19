@@ -26,12 +26,12 @@ if __name__ == "__main__":
         help="Path to the output mesh file"
     )
     parser.add_argument(
-        "w0", type=int, default=30,
-        help="Value for \\omega_0."
+        "--omega0", "-w", type=int, default=1,
+        help="Value for \\omega_0. Default is 1"
     )
     parser.add_argument(
         "--resolution", "-r", default=128, type=int,
-        help="Resolution to use on marching cubes."
+        help="Resolution to use on marching cubes. Default is 128"
     )
     parser.add_argument(
         "--times", "-t", nargs='+', default=[-1, 0, 1],
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     devstr = "cuda:0" if torch.cuda.is_available() else "cpu"
     device = torch.device(devstr)
 
-    model = from_pth(args.model_path, w0=args.w0, device=device).eval().to(device)
+    model = from_pth(args.model_path, w0=args.omega0, device=device).eval()
+    model = model.to(device)
     print(model)
     print(f"Running marching cubes running with resolution {args.resolution}")
 
