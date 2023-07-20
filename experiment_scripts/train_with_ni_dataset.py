@@ -457,10 +457,8 @@ if __name__ == '__main__':
 
     model.zero_grad(set_to_none=True)
     model.reset_weights()
-    init_method = network_config["init_method"]
-    if args.init_method:
-        init_method = args.init_method
 
+    init_method = network_config.get("init_method", args.init_method)
     if init_method == "i3d":
         model.from_pretrained_initial_condition(torch.load(NI))
 
