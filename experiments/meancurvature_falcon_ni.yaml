@@ -1,9 +1,10 @@
 network:
   omega_0: 30
   hidden_layer_nodes: [256, 256, 256]
+  # init_method: i3d
 
 training:
-  n_epochs: 2000
+  n_epochs: 1000
   checkpoints_at_every_epoch: 2001
 
 loss:
@@ -11,7 +12,7 @@ loss:
   scale: 1e-3
 
 training_data:
-  batchsize: 90000
+  batchsize: 60000
   timesampler:
     range: [-0.1, 1.0]
   mesh:

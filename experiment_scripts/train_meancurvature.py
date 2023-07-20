@@ -488,6 +488,7 @@ if __name__ == '__main__':
     best_loss = torch.inf
     best_weigths = None
     omegas = dict()# {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
+    # omegas = {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     start_training_time = time.time()
     for e in range(nsteps):
         data = dataset[e]
