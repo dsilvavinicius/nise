@@ -463,10 +463,11 @@ if __name__ == '__main__':
     if init_method == "i3d":
         model.from_pretrained_initial_condition(torch.load(NI))
 
-    timerange = training_mesh_config[MESH]["timesampler"].get("range", [-1.0, 1.0])
-    dataset.time_sampler = torch.distributions.uniform.Uniform(
-        timerange[0], timerange[1]
-    )
+    if "timesampler" in training_mesh_config:
+        timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
+        dataset.time_sampler = torch.distributions.uniform.Uniform(
+            timerange[0], timerange[1]
+        )
 
     optim = torch.optim.Adam(
         lr=1e-4,
