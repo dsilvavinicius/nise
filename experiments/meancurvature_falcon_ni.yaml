@@ -12,10 +12,10 @@ loss:
 
 training_data:
   batchsize: 90000
+  timesampler:
+    range: [-0.1, 1.0]
   mesh:
     data/falcon_smooth.ply:
       ni: ni/falcon_smooth_2x128_w0-20.pth
       omega_0: 20
       t: 0.0
-      timesampler:
-        range: [-0.1, 1.0]

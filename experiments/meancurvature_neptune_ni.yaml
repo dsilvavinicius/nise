@@ -15,10 +15,10 @@ training_data:
   batchsize: 60000
   n_on_surface: 15000
   n_off_surface: 15000
+  timesampler:
+    range: [-0.05, 1.0]
   mesh:
     data/neptune.ply:
       ni: ni/neptune.pth
       omega_0: 40
       t: -1
-      timesampler:
-        range: [-0.05, 1.0]

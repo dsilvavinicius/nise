@@ -15,10 +15,10 @@ training_data:
   batchsize: 20000
   n_on_surface: 5000
   n_off_surface: 5000
+  timesampler:
+    range: [-0.5, 1.0]
   mesh:
     data/max.ply:
       ni: ni/max.pth
       omega_0: 30
       t: -1
-      timesampler:
-        range: [-0.5, 1.0]
