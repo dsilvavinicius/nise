@@ -28,30 +28,30 @@
 
 	<div id="authors">
         <div class="author-row">
-            <div class="col-3 text-center"><a href="https://sites.google.com/site/tiagonovellodebrito">Tiago Novello</a><sup>1*</sup></div>
-			<div class="col-3 text-center"><a href="https://schardong.github.io">Guilherme Schardong</a><sup>2*</sup></div>
-			<div class="col-3 text-center"><a href="http://www.inf.puc-rio.br/~lopes">Hélio Lopes</a><sup>2*</sup></div>
+            <div class="col-3 text-center"><a href="https://sites.google.com/site/tiagonovellodebrito">Tiago Novello</a><sup>1</sup></div>
+			<div class="col-3 text-center"><a href="https://dsilvavinicius.github.io">Vinícius da Silva</a><sup>2</sup></div>
+			<div class="col-3 text-center"><a href="http://www.inf.puc-rio.br/~lopes">Hélio Lopes</a><sup>2</sup></div>
 		</div>
 		<div class="author-row">
-			<div class="col-3 text-center"><a href="https://dsilvavinicius.github.io">Vinícius da Silva</a><sup>2*</sup></div>
-			<div class="col-3 text-center"><a href="https://www.lschirmer.com/">Luiz Schirmer</a><sup>4*</sup></div>
-			<div class="col-3 text-center"><a href="https://lvelho.impa.br">Luiz Velho</a><sup>1*</sup></div>
+			<div class="col-3 text-center"><a href="https://schardong.github.io">Guilherme Schardong</a><sup>2</sup></div>
+			<div class="col-3 text-center"><a href="https://www.lschirmer.com/">Luiz Schirmer</a><sup>4</sup></div>
+			<div class="col-3 text-center"><a href="https://lvelho.impa.br">Luiz Velho</a><sup>1</sup></div>
 		</div>
 
         <div class="affil-row">
-			<div class="col-3 text-center"><sup>1</sup>IMPA</div>
-            <div class="col-3 text-center"><sup>2</sup>PUC-Rio</div>
-            <div class="col-3 text-center"><sup>3</sup>University of Coimbra</div>
-			<div class="col-3 text-center"><sup>4</sup>Unisinos</div>
+			<div class="col-4 text-center"><sup>1</sup>IMPA</div>
+            <div class="col-4 text-center"><sup>2</sup>PUC-Rio</div>
+            <div class="col-4 text-center"><sup>3</sup>University of Coimbra</div>
+			<div class="col-4 text-center"><sup>4</sup>Unisinos</div>
         </div>
 
 		<div style="clear: both">
 			<div class="paper-btn-parent">
-				<a class="paper-btn" href="assets/novello2022neural.pdf">
+				<a class="paper-btn" href="https://visgraf.impa.br/papers/i4d-iccv2023-reb.pdf">
 					<span class="material-icons"> description </span>
-					Paper
+					Paper, supplementary, rebuttal
 				</a>
-				<a class="paper-btn" href="https://youtu.be/Vdf4AYRdYrY">
+				<a class="paper-btn" href="https://youtu.be/8NqwLkhaRBU">
 					<span class="material-icons"> videocam </span>
 					Video
 				</a>
@@ -102,7 +102,8 @@
 		<h2>News</h2>
 		<hr>
 		<div class="row">
-			<div><span class="material-icons"> description </span> [Jan 27th 2022] Page online.</div>
+			<div><span class="material-icons"> description </span> [Jul 14th 2023] <a href="https://twitter.com/dsilvavinicius/status/1679991981718609925?s=20">Paper accepted to #ICCV23.</a></div>
+			<div><span class="material-icons"> description </span> [Jul 20th 2023] Page online.</div>
 		</div>
 	</section>
 	
@@ -110,11 +111,10 @@
 		<h2>Abstract</h2>
 		<hr>
 		<p>
-			This work investigates the use of neural networks admitting high-order derivatives for modeling dynamic variations of smooth implicit surfaces. For this purpose, it extends the representation of differentiable neural implicit surfaces to higher dimensions, which opens up mechanisms that allow to exploit geometric transformations in many settings, from animation and surface evolution to shape morphing and design galleries.<br> 
-            
-            The problem is modeled by a \(k-\)<b><i>parameter family</i></b> of surfaces \(S_c\), specified as a neural network function \(f : R^3 \times R^k \rightarrow R\), where \(S_c\) is the zero-level set of the implicit function \(f(\cdot, c) : R^3 \rightarrow R \), with \(c \in R^k\), with variations induced by the control variable \(c\).
-            
-            In that context, restricted to each coordinate of \(R^k\), the underlying representation is a neural homotopy  which is the solution of a general <b><i>partial differential equation</i></b> (PDE).
+			This work investigates the use of smooth neural networks for modeling dynamic variations of implicit surfaces under the <b>level set equation (LSE)</b>. For this, it extends the representation of neural implicit surfaces to the space-time \(R^3\!\!\times\! R\), which opens up mechanisms for <b>continuous</b> geometric transformations. Examples include evolving an initial surface towards general vector fields, smoothing and sharpening using the mean curvature equation, and interpolations of initial conditions.
+
+			The network training considers two constraints. A <i>data</i> term is responsible for fitting the initial condition to the corresponding time instant, usually \(R^3\!\! \times\! \{0\}\). Then, a <i>LSE</i> term forces the network to approximate the underlying geometric evolution given by the LSE, <b>without any supervision</b>.
+			The network can also be <b>initialized based on previously trained initial conditions</b> resulting in faster convergence when compared with the standard approach.
 		</p>
 	</section>
 
@@ -142,24 +142,24 @@
 
 		<div>
 			<div class="col-2 text-center">
-				<h3>Dumbbell</h3>
+				<h3>Vector Field: Bob</h3>
 				<hr>
 
 				<figure>
 					<video class="centered" width="100%" autoplay muted loop playsinline>
-						<source src="assets/dumbbell.mp4" type="video/mp4">
+						<source src="assets/bob_vector_1080.mp4" type="video/mp4">
 						Your browser does not support the video tag.
 					</video>
 				</figure>
 			</div>
 
 			<div class="col-2 text-center">
-				<h3>Morphing the Sphere into the Armadillo</h3>
+				<h3>Vector Field: Spot</h3>
 				<hr>
 
 				<figure>
 					<video class="centered" width="100%" autoplay muted loop playsinline>
-						<source src="assets/sphere_armadillo.mp4" type="video/mp4">
+						<source src="assets/spot_vector_1080.mp4" type="video/mp4">
 						Your browser does not support the video tag.
 					</video>
 				</figure>
@@ -168,24 +168,76 @@
 
 		<div>
 			<div class="col-2 text-center">
-				<h3>Morphing the Armadillo into the Woman</h3>
+				<h3>Interpolation: Torus -> Bob</h3>
 				<hr>
 
 				<figure>
 					<video class="centered" width="100%" autoplay muted loop playsinline>
-						<source src="assets/armadillo_woman.mp4" type="video/mp4">
+						<source src="assets/bob_torus_1080.mp4" type="video/mp4">
 						Your browser does not support the video tag.
 					</video>
 				</figure>
 			</div>
 
 			<div class="col-2 text-center">
-				<h3>Morphing the Armadillo into the Happy Buddha</h3>
+				<h3>Interpolation: Spot -> Bob</h3>
 				<hr>
 
 				<figure>
 					<video class="centered" width="100%" autoplay muted loop playsinline>
-						<source src="assets/armadillo_buddha.mp4" type="video/mp4">
+						<source src="assets/spot_torus_1080.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+		</div>
+
+		<div>
+			<div class="col-2 text-center">
+				<h3>Interpolation: Spot -> Bob</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/spot_torus_up_1080.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+
+			<div class="col-2 text-center">
+				<h3>Interpolation: Falcon -> Witch</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/falcon_witch_1080.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+		</div>
+
+		<div>
+			<div class="col-2 text-center">
+				<h3>Smoothing: Bunny</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/bunny_curvature_1080.mp4" type="video/mp4">
+						Your browser does not support the video tag.
+					</video>
+				</figure>
+			</div>
+
+			<div class="col-2 text-center">
+				<h3>Smoothing: Dumbbell</h3>
+				<hr>
+
+				<figure>
+					<video class="centered" width="100%" autoplay muted loop playsinline>
+						<source src="assets/dumbbell_1080.mp4" type="video/mp4">
 						Your browser does not support the video tag.
 					</video>
 				</figure>

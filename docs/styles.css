@@ -186,7 +186,7 @@ figure {
   background-color: #1367a7;
   color: #ecf0f1 !important;
   font-size: 20px;
-  width: 130px;
+  /*width: 130px;*/
   font-weight: 600;
 }
 .paper-btn-parent {
