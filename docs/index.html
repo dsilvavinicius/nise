@@ -141,11 +141,17 @@
 		We propose representing this implicit evolution by a (coord-based) neural network \(f_\theta:R^3\times R\to R\).
 		We define the following loss functional to train \(f_\theta\) to approximate a solution to the LSE problem:
 		<br>
+<<<<<<< HEAD
 		<p font-size="12px">
 		\(L(\theta)\!=\!\!\!\!\!
 		\int\limits_{R^3\times {0}}\!\!\!\left(f_\theta\!-\!g\right)^2 dx+\!\!\!\!\!\!\!
 		\int\limits_{R^3\times (a,b)}\!\!\!\!\!\!\big(\frac{\partial f_\theta}{\partial t}\!-\!v|{\nabla f_\theta}|\big)^2 dx dt\).
 		</p>
+=======
+		\(L(\theta)=\!\!\!
+		\int\limits_{R^3\times {0}}\!\!\!\left(f_\theta-g\right)^2 dx+\!\!\!
+		\int\limits_{R^3\times (a,b)}\!\!\!\!\left(\frac{\partial f_\theta}{\partial t}-v|{\nabla f_\theta}|\right)^2 dx dt\).
+>>>>>>> f9b1df839ca4e423f2b86328c10bf66299785830
 
 		<br>
 		<br>
