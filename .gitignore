@@ -132,3 +132,6 @@ dmypy.json
 
 .DS_Store
 .vscode
+
+ni/
+results/
