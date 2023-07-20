@@ -123,8 +123,7 @@ for e in range(EPOCHS):
 
         optimizer.zero_grad()
         outputs = model(inputs)
-        #loss = loss_mean_curv(outputs, gt)
-        loss = loss_mean_curv_denoising(outputs, gt)
+        loss = loss_mean_curv(outputs, gt)
 
         train_loss = torch.zeros((1, 1), device=device)
         for it, l in loss.items():
