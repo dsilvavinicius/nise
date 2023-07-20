@@ -52,6 +52,6 @@ if __name__ == "__main__":
     print(f"Running marching cubes running with resolution {args.resolution}")
 
     times = [float(t) for t in args.times]
-    reconstruct_at_times(model, times, out_dir, device=device)
+    reconstruct_at_times(model, times, out_dir, resolution=args.resolution, device=device)
 
     print("Done")
