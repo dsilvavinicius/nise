@@ -93,7 +93,8 @@
 
 		<figure style="width: 100%; float: left">
 			<p class="caption_justify">
-				Caption.
+				Neural implicit surface evolutions using our framework: interpolation between implicit surfaces, 
+				evolution driven by vector fields, and mean curvature equation.
 			</p>
 		</figure>
 	</section>
@@ -122,17 +123,43 @@
 		<h2>Overview</h2>
 		<hr>
 		<p>	
-		Let \(S\) be a surface in \(R^3\), and \(g:R^3\rightarrow R\) be an unknown neural implicit function. To compute the parameter set of \(g\) such that \(g^{-1}(0)\) approximates \(S\), it is common to consider the <b><i>Eikonal</i></b> problem.<br> 
+		Let \(g:R^3\rightarrow R\) be a <i>neural implicit function</i> having a surface \(S\) as its zero-level set.
+		Specifically, \(g\) is a sinusoidal neural network approximating the signed distance function of \(S\).
+		<br>
+		<br>
+		This work investigates the extension of the domain of neural implicit functions to the <i>space-time</i> \(R^3\times R\), 
+		encoding the evolution of the function \(g\) as a higher-dimensional function \(f:R^3\times R \to R\).
+		The resulting animation is governed by the <i>level set equation</i> (LSE) 
+		\(\frac{\partial f}{\partial t}=v|{\nabla f}|\), 
+		which encodes the propagation of the level sets \(S_t\) of \(f(\cdot, t)\) towards their normals with speed \(v\). 
+		The choice of the function \(v\) depends on the underlying geometric model.
 
-		We augment the domain \(R^3\) by a product space \(R^3\times R^k\), where \(p\in R^3\) denotes a point in the space and \(c\in R^k\) denotes a vector that control \(k\) directions of possible animations of the initial implicit surface. 
-		In this work we focus on the <b><i>space-time</i></b> \(R^3\times R\). <br>
+		<br>
+		<br>
 
-		Specifically, let \(f:R^3\times R \rightarrow R\) be a smooth neural function representing an <b><i>one-parameter</i></b> family of neural implicit functions \(f_t:R^3\rightarrow R\) defined by \(f_t(p)=f(p,t)\). Topologically, the family \(f_t\) represents <b><i>homotopies</i></b> between any two functions \(f_{t_0},\,f_{t_1}:R^3\rightarrow R\), with \(t_0, t_1\in R\). Thus, we say that \(f\) is a <b><i>neural homotopy function</i></b>.
-		The underlying family of neural implicit surfaces \(S_t = f_t^{-1} (0)\) is a <b><i>neural animation</i></b> of the initial surface \(S_0=S\). Restricted to the interval \([t_0,t_1]\), the surfaces \(S_t\) represent a <b><i>neural morphing</i></b> between the neural implicit surfaces \(S_{t_0}\) and \(S_{t_1}\).<br>
+		We propose representing this implicit evolution by a (coord-based) neural network \(f_\theta:R^3\times R\to R\).
+		We define the following loss functional to train \(f_\theta\) to approximate a solution to the LSE problem:
+		<br>
+		\(L(\theta)=
+		\int\limits_{R^3\times {0}}\left(f_\theta-g\right)^2 \,dx \,dt+
+		\int\limits_{R^3\times (a,b)}\left(\frac{\partial f_\theta}{\partial t}-v|{\nabla f_\theta}|\right)^2 \,dx \,dt\).
 
-		In the same way that we considered a neural implicit function as a solution of the Eikonal problem, we can consider the neural homotopy \(f: R^3\times R\rightarrow R\) to be a solution of a general PDE problem \(\mathcal{F}\big(\nabla^n f, \dots, \nabla^1 f, f, p, t\big)=0\). <b><i>Initial-boundary conditions</i></b> can also be used. In this work, we consider several definitions of \(\mathcal{F}\) to model problems such as animation, smoothing, morphing, keyframe interpolation, etc. 
-
-		The time \(t\) allows a continuous navigation in the neural animation \(S_t=f_t^{-1}(0)\). 
+		<br>
+		<br>
+		We present three examples of neural implicit evolution using LSE. For this, we simple define the function \(v\) for each example.
+		<br>
+		<ul>
+			<li>
+			First, we consider moving the surface \(S\) towards a vector field \(V:R^3\to R^3\), 
+			in this case, \(v=\langle V,N\rangle\), where \(N\) is the normal field.
+			</li>
+			<li>
+			Second, we move \(S\) by the mean curvature equation which is expressed as a LSE with \(v=div (N)\).
+			</li>
+			<li>
+			Finally, we deform \(g\) into a second function \(h\) using a LSE with \(v=-(h-f)\). 
+			</li>
+		</ul>
 		</p>
 	</section>
 
