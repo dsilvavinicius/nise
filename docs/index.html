@@ -93,8 +93,8 @@
 
 		<figure style="width: 100%; float: left">
 			<p class="caption_justify">
-				Neural implicit surface evolutions using our framework: interpolation between implicit surfaces, 
-				evolution driven by vector fields, and mean curvature equation.
+				Neural implicit surface evolutions using our method: interpolation between implicit surfaces, 
+				deformation driven by vector fields, and smoothing using the mean curvature equation.
 			</p>
 		</figure>
 	</section>
@@ -124,12 +124,12 @@
 		<h2>Overview</h2>
 		<hr>
 		<p>	
-		Let \(g:R^3\rightarrow R\) be a <i>neural implicit function</i> having a surface \(S\) as its zero-level set.
-		Specifically, \(g\) is a sinusoidal neural network approximating the signed distance function of \(S\).
+		Let \(g:R^3\rightarrow R\) be a <i>neural implicit function</i> (coord-based neural network) 
+		approximating the signed distance function of a given surface \(S\).
 		<br>
 		<br>
-		This work investigates the extension of the domain of neural implicit functions to the <i>space-time</i> \(R^3\times R\), 
-		encoding the evolution of the function \(g\) as a higher-dimensional function \(f:R^3\times R \to R\).
+		This work investigates the extension of the domain of \(g\) to the <i>space-time</i> \(R^3\times R\), 
+		encoding the evolution of \(g\) as a higher-dimensional function \(f:R^3\times R \to R\).
 		The resulting animation is governed by the <i>level set equation</i> (LSE) 
 		\(\frac{\partial f}{\partial t}=v|{\nabla f}|\), 
 		which encodes the propagation of the level sets \(S_t\) of \(f(\cdot, t)\) towards their normals with speed \(v\). 
@@ -138,8 +138,8 @@
 		<br>
 		<br>
 
-		We propose representing this implicit evolution by a (coord-based) neural network \(f_\theta:R^3\times R\to R\).
-		We define the following loss functional to train \(f_\theta\) to approximate a solution to the LSE problem:
+		We propose representing this implicit evolution by a (coord-based) neural network \(f_\theta:R^3\times R\to R\) 
+		and define the following loss functional to train \(f_\theta\) to approximate a solution to the LSE problem:
 		<br>
 		<p font-size="12px">
 		\(L(\theta)\!=\!\!\!\!\!
@@ -149,7 +149,8 @@
 
 		<br>
 		<br>
-		We present three examples of neural implicit evolution using the LSE. For this, we simple define the function \(v\) for each example.
+		We present three examples of neural implicit evolution using the LSE. 
+		For this, we only need to define the function \(v\) for each example:
 		<br>
 		<ul>
 			<li>
