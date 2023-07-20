@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # coding: utf-8
 
 import argparse
@@ -367,8 +368,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         description="Default training script when using Neural Implicits for"
-        " SDF querying. Note that command line arguments have precedence over"
-        " configuration file values."
+        " SDF querying and mean curvature experiments. Note that command line"
+        " arguments have precedence over configuration file values."
     )
     parser.add_argument(
         "experiment_config", type=str, help="Path to the YAML experiment"
@@ -457,17 +458,16 @@ if __name__ == '__main__':
 
     model.zero_grad(set_to_none=True)
     model.reset_weights()
-    init_method = network_config["init_method"]
-    if args.init_method:
-        init_method = args.init_method
 
+    init_method = network_config.get("init_method", args.init_method)
     if init_method == "i3d":
         model.from_pretrained_initial_condition(torch.load(NI))
 
-    timerange = training_mesh_config[MESH]["timesampler"].get("range", [-1.0, 1.0])
-    dataset.time_sampler = torch.distributions.uniform.Uniform(
-        timerange[0], timerange[1]
-    )
+    if "timesampler" in training_mesh_config:
+        timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
+        dataset.time_sampler = torch.distributions.uniform.Uniform(
+            timerange[0], timerange[1]
+        )
 
     optim = torch.optim.Adam(
         lr=1e-4,

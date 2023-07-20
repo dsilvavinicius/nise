@@ -1,8 +1,6 @@
 network:
   omega_0: 30
   hidden_layer_nodes: [256, 256, 256]
-  # init_method: i3d
-  init_method: 
 
 training:
   n_epochs: 2000
@@ -14,10 +12,10 @@ loss:
 
 training_data:
   batchsize: 90000
+  timesampler:
+    range: [-0.1, 1.0]
   mesh:
     data/falcon_smooth.ply:
       ni: ni/falcon_smooth_2x128_w0-20.pth
       omega_0: 20
       t: 0.0
-      timesampler:
-        range: [-0.1, 1.0]
