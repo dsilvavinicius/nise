@@ -12,10 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.model import SIREN
 from i4d.loss import (loss_level_set, loss_mean_curv_with_restrictions,
-                      loss_morphing_two_sirens, loss_GPNF, loss_mean_curv,
+                      loss_morphing_two_sirens, loss_NFGP, loss_mean_curv,
                       loss_eikonal, loss_eikonal_mean_curv, loss_constant,
-                      loss_transport, loss_vector_field_morph,
-                      sdf_sitzmann_time, sdf_time, sdf_boundary_problem)
+                      loss_transport, loss_vector_field_morph)
 from i4d.meshing import create_mesh
 from i4d.util import create_output_paths, load_experiment_parameters
 
@@ -309,13 +308,7 @@ if __name__ == "__main__":
 
     loss = parameter_dict.get("loss")
     if loss is not None and loss:
-        if loss == "sitzmann":
-            loss_fn = sdf_sitzmann_time
-        elif loss == "true_sdf":
-            loss_fn = sdf_time
-        elif loss == "sdf_boundary_problem":
-            loss_fn = sdf_boundary_problem
-        elif loss == "loss_mean_curv":
+        if loss == "loss_mean_curv":
             loss_fn = loss_mean_curv
         elif loss == "loss_mean_curv_with_restrictions":
             loss_fn = loss_mean_curv_with_restrictions
@@ -329,8 +322,8 @@ if __name__ == "__main__":
             loss_fn = loss_transport
         elif loss == "loss_vector_field_morph":
             loss_fn = loss_vector_field_morph
-        elif loss == "loss_GPNF":
-            loss_fn = loss_GPNF(pretrained_ni)
+        elif loss == "loss_NFGP":
+            loss_fn = loss_NFGP(pretrained_ni)
         elif loss == "loss_level_set":
             loss_fn = loss_level_set(pretrained_ni)
         elif loss == "loss_morphing_two_sirens":
