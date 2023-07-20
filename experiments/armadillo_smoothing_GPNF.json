@@ -14,7 +14,7 @@
     "experiment_name": "armadillo_2x128_w-30_GPNF_tau-50_test",
     "epochs_to_checkpoint": 1000,
     "epochs_to_reconstruction": 1000,
-    "loss": "loss_GPNF",
+    "loss": "loss_NFGP",
     "optimizer": {
         "type": "adam",
         "lr": 1e-4
