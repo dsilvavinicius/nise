@@ -6,11 +6,11 @@ import os.path as osp
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from dataset import SpaceTimePointCloudNI
-from loss import loss_mean_curv
-from meshing import create_mesh
-from model import SIREN
-from util import create_output_paths, load_experiment_parameters
+from i4d.dataset import SpaceTimePointCloudNI, SpaceTimePointCloud
+from i4d.loss import loss_mean_curv
+from i4d.meshing import create_mesh
+from i4d.model import SIREN
+from i4d.util import create_output_paths
 
 
 def reconstruct_at_times(model, times, epoch, meshpath, resolution=256, device="cpu"):
