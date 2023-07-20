@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # coding: utf-8
 
 import argparse
@@ -367,8 +368,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         description="Default training script when using Neural Implicits for"
-        " SDF querying. Note that command line arguments have precedence over"
-        " configuration file values."
+        " SDF querying and mean curvature experiments. Note that command line"
+        " arguments have precedence over configuration file values."
     )
     parser.add_argument(
         "experiment_config", type=str, help="Path to the YAML experiment"
