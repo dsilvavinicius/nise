@@ -423,23 +423,26 @@ if __name__ == '__main__':
     training_data_config = config["training_data"]
     training_mesh_config = training_data_config["mesh"]
 
-    MESH = list(training_mesh_config.keys())[0]
-    NI = training_mesh_config[MESH]["ni"]
-    W0 = training_mesh_config[MESH].get("omega_0", 1)
+    # Just one mesh for mean-curvature-equation cases
+    mesh = list(training_mesh_config.keys())[0]
+    ni = training_mesh_config[mesh]["ni"]
+    w0 = training_mesh_config[mesh].get("omega_0", 1)
 
-    EPOCHS = training_config.get("n_epochs", 100)
+    epochs = training_config.get("n_epochs", 100)
     if args.epochs:
-        EPOCHS = args.epochs
+        epochs = args.epochs
 
-    BATCHSIZE = training_data_config["batchsize"]
+    batchsize = training_data_config.get("batchsize", 20000)
+    if args.batchsize:
+        batchsize = args.batchsize
     dataset = STPointCloudNI(
-        [(MESH, NI, training_mesh_config[MESH]['t'], W0)],
-        BATCHSIZE
+        [(mesh, ni, training_mesh_config[mesh]['t'], w0)],
+        batchsize
     )
 
-    nsteps = round(EPOCHS * (2 * len(dataset) / BATCHSIZE))
+    nsteps = round(epochs * (2 * len(dataset) / batchsize))
     WARMUP_STEPS = nsteps // 10
-    CHECKPOINT_AT = 0
+    checkpoint_at = training_config.get("checkpoints_at_every_epoch", 0)
     print(f"Total # of training steps = {nsteps}")
 
     network_config = config["network"]
@@ -461,7 +464,7 @@ if __name__ == '__main__':
 
     init_method = network_config.get("init_method", args.init_method)
     if init_method == "i3d":
-        model.from_pretrained_initial_condition(torch.load(NI))
+        model.from_pretrained_initial_condition(torch.load(ni))
 
     if "timesampler" in training_mesh_config:
         timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
@@ -474,13 +477,13 @@ if __name__ == '__main__':
         params=model.parameters()
     )
 
-    trainingpts = torch.zeros((BATCHSIZE, 4), device=device)
-    trainingnormals = torch.zeros((BATCHSIZE, 3), device=device)
-    trainingsdf = torch.zeros((BATCHSIZE), device=device)
+    trainingpts = torch.zeros((batchsize, 4), device=device)
+    trainingnormals = torch.zeros((batchsize, 3), device=device)
+    trainingsdf = torch.zeros((batchsize), device=device)
 
-    n_on_surface = config["training_data"].get("n_on_surface", math.ceil(BATCHSIZE * 0.25))
-    n_off_surface = config["training_data"].get("n_off_surface", math.ceil(BATCHSIZE * 0.25))
-    n_int_times = config["training_data"].get("n_int_times", BATCHSIZE - (n_on_surface + n_off_surface))
+    n_on_surface = config["training_data"].get("n_on_surface", math.ceil(batchsize * 0.25))
+    n_off_surface = config["training_data"].get("n_off_surface", math.ceil(batchsize * 0.25))
+    n_int_times = config["training_data"].get("n_int_times", batchsize - (n_on_surface + n_off_surface))
     training_loss = {}
     scale = float(config["loss"].get("scale", 1e-3))
     lossmeancurv = LossMeanCurvature(scale=scale)
@@ -489,6 +492,18 @@ if __name__ == '__main__':
     best_weigths = None
     omegas = dict()# {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     # omegas = {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
+
+    updated_config = copy.deepcopy(config)
+    updated_config["network"]["init_method"] = init_method
+    updated_config["training"]["n_epochs"] = epochs
+    updated_config["training_data"]["batchsize"] = batchsize
+    updated_config["training_data"]["n_on_surface"] = n_on_surface
+    updated_config["training_data"]["n_off_surface"] = n_off_surface
+    updated_config["training_data"]["n_int_times"] = n_int_times
+
+    with open(osp.join(experimentpath, "config.yaml"), 'w') as f:
+        yaml.dump(updated_config, f)
+
     start_training_time = time.time()
     for e in range(nsteps):
         data = dataset[e]
@@ -532,7 +547,7 @@ if __name__ == '__main__':
                 best_weights = copy.deepcopy(model.state_dict())
                 best_loss = running_loss.item()
 
-            if CHECKPOINT_AT and e and not e % CHECKPOINT_AT:
+            if checkpoint_at and e and not e % checkpoint_at:
                 times = [-1., -0.5, 0.0, 0.9]
                 meshpath = osp.join(experimentpath, "reconstructions", f"check_{e}")
                 os.makedirs(meshpath, exist_ok=True)
