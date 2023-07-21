@@ -1,5 +1,5 @@
 network:
-  omega_0: 60
+  omega_0: 30
   hidden_layer_nodes: [128, 128, 128]
   init_method: i3d
 

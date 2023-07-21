@@ -21,4 +21,4 @@ training_data:
     data/neptune.ply:
       ni: ni/neptune.pth
       omega_0: 40
-      t: -1
+      t: 0
