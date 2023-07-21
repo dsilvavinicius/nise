@@ -215,6 +215,10 @@ class LossMeanCurvature(torch.nn.Module):
         #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
         grad = grad[..., 0:3]
 
+        grad_len = grad.norm(dim=-1).unsqueeze(-1)
+        mean_curvature_constraint = torch.where(grad_len<10. , mean_curvature_constraint, torch.zeros_like(mean_curvature_constraint))
+        mean_curvature_constraint = torch.where(grad_len>1e-3, mean_curvature_constraint, torch.zeros_like(mean_curvature_constraint))
+
         # Initial-boundary constraints of the Eikonal equation at t=0
         sdf_constraint = torch.where(
             gt_sdf != -1,
@@ -232,7 +236,7 @@ class LossMeanCurvature(torch.nn.Module):
         )
 
         return {
-            "sdf_constraint": sdf_constraint.mean() * 3e3, # 1e3
+            "sdf_constraint": sdf_constraint.mean() * 2e3, # 1e3
             "normal_constraint": normal_constraint.mean() * 1e1,
             "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
         }
