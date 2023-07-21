@@ -435,6 +435,7 @@ if __name__ == '__main__':
     batchsize = training_data_config.get("batchsize", 20000)
     if args.batchsize:
         batchsize = args.batchsize
+
     dataset = STPointCloudNI(
         [(mesh, ni, training_mesh_config[mesh]['t'], w0)],
         batchsize
@@ -443,6 +444,12 @@ if __name__ == '__main__':
     nsteps = round(epochs * (2 * len(dataset) / batchsize))
     WARMUP_STEPS = nsteps // 10
     checkpoint_at = training_config.get("checkpoints_at_every_epoch", 0)
+    if checkpoint_at:
+        checkpoint_at = round(checkpoint_at * (2 * len(dataset) / batchsize))
+        print(f"Checkpoints at every {checkpoint_at} training steps")
+    else:
+        print("Checkpoints disabled")
+
     print(f"Total # of training steps = {nsteps}")
 
     network_config = config["network"]
@@ -484,14 +491,9 @@ if __name__ == '__main__':
     n_on_surface = config["training_data"].get("n_on_surface", math.ceil(batchsize * 0.25))
     n_off_surface = config["training_data"].get("n_off_surface", math.ceil(batchsize * 0.25))
     n_int_times = config["training_data"].get("n_int_times", batchsize - (n_on_surface + n_off_surface))
-    training_loss = {}
+
     scale = float(config["loss"].get("scale", 1e-3))
     lossmeancurv = LossMeanCurvature(scale=scale)
-
-    best_loss = torch.inf
-    best_weigths = None
-    omegas = dict()# {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
-    # omegas = {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
 
     updated_config = copy.deepcopy(config)
     updated_config["network"]["init_method"] = init_method
@@ -503,6 +505,11 @@ if __name__ == '__main__':
 
     with open(osp.join(experimentpath, "config.yaml"), 'w') as f:
         yaml.dump(updated_config, f)
+
+    best_loss = torch.inf
+    best_weigths = None
+    omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
+    training_loss = {}
 
     start_training_time = time.time()
     for e in range(nsteps):
