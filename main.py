@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.model import SIREN
 from i4d.loss import (loss_level_set, loss_mean_curv_with_restrictions,
-                      loss_morphing_two_sirens, loss_NFGP, loss_mean_curv,
+                      LossMorphingNI, loss_NFGP, loss_mean_curv,
                       loss_eikonal, loss_eikonal_mean_curv, loss_constant,
                       loss_transport, loss_vector_field_morph)
 from i4d.meshing import create_mesh
@@ -327,7 +327,7 @@ if __name__ == "__main__":
         elif loss == "loss_level_set":
             loss_fn = loss_level_set(pretrained_ni)
         elif loss == "loss_morphing_two_sirens":
-            loss_fn = loss_morphing_two_sirens(pretrained_ni1, pretrained_ni2)
+            loss_fn = LossMorphingNI(pretrained_ni1, pretrained_ni2)
         else:
             warnings.warn(f"Invalid loss function option {loss}. Using default.")
 

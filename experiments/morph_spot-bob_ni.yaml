@@ -1,0 +1,24 @@
+network:
+  omega_0: 20
+  hidden_layer_nodes: [128, 128]
+
+training:
+  n_epochs: 2001
+  checkpoints_at_every_epoch: 101
+
+loss:
+  type: morphing_sirens
+
+training_data:
+  batchsize: 8000
+  timesampler:
+    range: [-1.0, 1.0]
+  mesh:
+    data/spot.ply:
+      ni: ni/spot_1x64_w0-16.pth
+      omega_0: 16
+      t: -1
+    data/bob.ply:
+      ni: ni/bob_1x64_w0-16.pth
+      omega_0: 16
+      t: 1
