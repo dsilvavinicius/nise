@@ -12,13 +12,11 @@ loss:
   scale: 1e-3
 
 training_data:
-  batchsize: 20000
-  n_on_surface: 5000
-  n_off_surface: 5000
+  batchsize: 30000
   timesampler:
     range: [-1.0, 1.0]
   mesh:
     data/witch.ply:
       ni: ni/witch_2x128_w0-30.pth
       omega_0: 30
-      t: -1
+      t: 0
