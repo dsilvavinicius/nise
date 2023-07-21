@@ -21,4 +21,4 @@ training_data:
     data/spot.ply:
       ni: ni/spot_1x64_w0-16.pth
       omega_0: 16
-      t: -1
+      t: 0
