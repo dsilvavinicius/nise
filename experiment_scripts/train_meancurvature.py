@@ -441,7 +441,7 @@ if __name__ == '__main__':
         batchsize
     )
 
-    nsteps = round(epochs * (2 * len(dataset) / batchsize))
+    nsteps = round(epochs * (4 * len(dataset) / batchsize))
     WARMUP_STEPS = nsteps // 10
     checkpoint_at = training_config.get("checkpoints_at_every_epoch", 0)
     if checkpoint_at:
