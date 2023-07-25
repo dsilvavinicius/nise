@@ -473,8 +473,9 @@ if __name__ == '__main__':
     if init_method == "i3d":
         model.from_pretrained_initial_condition(torch.load(ni))
 
-    if "timesampler" in training_mesh_config:
-        timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
+
+    if "timesampler" in training_data_config:
+        timerange = training_data_config["timesampler"].get("range", [-1.0, 1.0])
         dataset.time_sampler = torch.distributions.uniform.Uniform(
             timerange[0], timerange[1]
         )
