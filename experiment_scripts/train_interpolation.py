@@ -484,8 +484,6 @@ if __name__ == "__main__":
     n_off_surface = config["training_data"].get("n_off_surface", math.ceil(batchsize * 0.25))
     n_int_times = config["training_data"].get("n_int_times", batchsize - (n_on_surface + n_off_surface))
 
-    scale = float(config["loss"].get("scale", 1e-3))
-
     allni = [vertni[1] for vertni in dataset.vertices_ni]
     lossmorph = LossMorphingNI(allni[0], allni[1])
 
