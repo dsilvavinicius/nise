@@ -445,7 +445,7 @@ if __name__ == '__main__':
     WARMUP_STEPS = nsteps // 10
     checkpoint_at = training_config.get("checkpoints_at_every_epoch", 0)
     if checkpoint_at:
-        checkpoint_at = round(checkpoint_at * (2 * len(dataset) / batchsize))
+        checkpoint_at = round(checkpoint_at * (4 * len(dataset) / batchsize))
         print(f"Checkpoints at every {checkpoint_at} training steps")
     else:
         print("Checkpoints disabled")
@@ -473,7 +473,6 @@ if __name__ == '__main__':
     if init_method == "i3d":
         model.from_pretrained_initial_condition(torch.load(ni))
 
-
     if "timesampler" in training_data_config:
         timerange = training_data_config["timesampler"].get("range", [-1.0, 1.0])
         dataset.time_sampler = torch.distributions.uniform.Uniform(
@@ -489,12 +488,14 @@ if __name__ == '__main__':
     trainingnormals = torch.zeros((batchsize, 3), device=device)
     trainingsdf = torch.zeros((batchsize), device=device)
 
-    n_on_surface = config["training_data"].get("n_on_surface", math.ceil(batchsize * 0.25))
-    n_off_surface = config["training_data"].get("n_off_surface", math.ceil(batchsize * 0.25))
-    n_int_times = config["training_data"].get("n_int_times", batchsize - (n_on_surface + n_off_surface))
+    n_on_surface = training_data_config.get("n_on_surface", math.floor(batchsize * 0.25))
+    n_off_surface = training_data_config.get("n_off_surface", math.ceil(batchsize * 0.25))
+    n_int_times = training_data_config.get("n_int_times", batchsize - (n_on_surface + n_off_surface))
 
     scale = float(config["loss"].get("scale", 1e-3))
     lossmeancurv = LossMeanCurvature(scale=scale)
+
+    checkpoint_times = config["training"].get("checkpoint_times", losstimes)
 
     updated_config = copy.deepcopy(config)
     updated_config["network"]["init_method"] = init_method
@@ -556,11 +557,13 @@ if __name__ == '__main__':
                 best_loss = running_loss.item()
 
             if checkpoint_at and e and not e % checkpoint_at:
-                times = [-1., -0.5, 0.0, 0.9]
-                meshpath = osp.join(experimentpath, "reconstructions", f"check_{e}")
+                meshpath = osp.join(
+                    experimentpath, "reconstructions", f"check_{e}"
+                )
                 os.makedirs(meshpath, exist_ok=True)
                 reconstruct_with_curvatures(
-                    model, times, meshpath, device=device, resolution=256
+                    model, checkpoint_times, meshpath, device=device,
+                    resolution=256
                 )
                 model = model.train()
 
@@ -572,7 +575,9 @@ if __name__ == '__main__':
     writer.flush()
     writer.close()
 
-    torch.save(model.state_dict(), osp.join(experimentpath, "models", "weights.pth"))
+    torch.save(
+        model.state_dict(), osp.join(experimentpath, "models", "weights.pth")
+    )
     model.load_state_dict(best_weights)
     model.update_omegas(w0=1)
     torch.save(
