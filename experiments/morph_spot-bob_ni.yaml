@@ -4,10 +4,12 @@ network:
 
 training:
   n_epochs: 2001
-  checkpoints_at_every_epoch: 101
+  checkpoints_at_every_epoch: 200
+  checkpoint_times: [-0.2, -0.1, 0, 0.1, 0.2]
 
 loss:
   type: morphing_sirens
+  times: [-0.1, 0.1]
 
 training_data:
   batchsize: 8000
@@ -17,8 +19,8 @@ training_data:
     data/spot.ply:
       ni: ni/spot_1x64_w0-16.pth
       omega_0: 16
-      t: -1
+      t: -0.1
     data/bob.ply:
       ni: ni/bob_1x64_w0-16.pth
       omega_0: 16
-      t: 1
+      t: 0.1
