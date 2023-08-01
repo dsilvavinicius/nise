@@ -541,8 +541,8 @@ class LossMorphingNI(torch.nn.Module):
 
         time = coords[...,3].unsqueeze(-1)
 
-        time_init=-0.2
-        time_final=0.2
+        time_init=-0.1
+        time_final=0.1
 
 
         # Initial-boundary constraints of the Eikonal equation at t=0

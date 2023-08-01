@@ -12,9 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.model import SIREN
 from i4d.loss import (loss_level_set, loss_mean_curv_with_restrictions,
-                      LossMorphingNI, loss_NFGP, loss_mean_curv,
+                      LossMorphingNI, loss_NFGP, LossMeanCurvature,
                       loss_eikonal, loss_eikonal_mean_curv, loss_constant,
-                      loss_transport, loss_vector_field_morph)
+                      loss_transport)
 from i4d.meshing import create_mesh
 from i4d.util import create_output_paths, load_experiment_parameters
 
@@ -199,48 +199,48 @@ if __name__ == "__main__":
     for d in datasets:
         d[0] = os.path.join("data", d[0])
 
-    if len(datasets[0]) == 3:
-        # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
-        # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
-        # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
-        # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
-        pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
-        # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
-        pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
-        pretrained_ni.eval()
-        pretrained_ni.to(device)
-        datasets[0] = [datasets[0][0], datasets[0][2]]
+    # if len(datasets[0]) == 3:
+    #     # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)#for neural spot
+    #     # pretrained_ni = SIREN(3, 1, [128,128,128], w0=30)#for neural spot
+    #     # pretrained_ni = SIREN(3, 1, [128,128], w0=24)
+    #     # pretrained_ni = SIREN(3, 1, [64,64], w0=16)
+    #     pretrained_ni = SIREN(3, 1, [256, 256, 256], w0=30)
+    #     # pretrained_ni = SIREN(3, 1, [64, 64], w0=16)
+    #     pretrained_ni.load_state_dict(torch.load(datasets[0][1]))
+    #     pretrained_ni.eval()
+    #     pretrained_ni.to(device)
+    #     datasets[0] = [datasets[0][0], datasets[0][2]]
 
-    # # TODO: think in how to consider multiples trained sirens
-    # # pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
+    # TODO: think in how to consider multiples trained sirens
+    pretrained_ni1 = SIREN(3, 1, [64, 64], w0=16)
     # pretrained_ni1 = SIREN(3, 1, [128,128,128], w0=20)
-    # #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
-    # #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
-    # #pretrained_ni1.load_state_dict(torch.load('shapeNets/torus_1x64_w0-16.pth'))
-    # # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
+    #pretrained_ni1 = SIREN(3, 1, [64,64], w0=16)
+    #pretrained_ni1.load_state_dict(torch.load('shapeNets/spot_1x64_w0-16.pth'))
+    pretrained_ni1.load_state_dict(torch.load('ni/torus_1x64_w0-16.pth'))
+    # pretrained_ni1.load_state_dict(torch.load('shapeNets/fantasma_1x64_w0-16.pth'))
     # pretrained_ni1.load_state_dict(torch.load('shapeNets/falcon_smooth_2x128_w0-20.pth'))
-    # pretrained_ni1.eval()
-    # pretrained_ni1.to(device)
+    pretrained_ni1.eval()
+    pretrained_ni1.to(device)
 
-    # # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    # # pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
     # pretrained_ni2 = SIREN(3, 1, [128,128,128], w0=30)
-    # #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
+    #pretrained_ni2 = SIREN(3, 1, [128,128], w0=20)
 
-    # # pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
-    # #pretrained_ni2.load_state_dict(torch.load('shapeNets/bob_1x64_w0-16.pth'))
-    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
-    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
-    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
-    # # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
+    pretrained_ni2 = SIREN(3, 1, [64,64], w0=16)
+    pretrained_ni2.load_state_dict(torch.load('ni/bob_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/bitorus_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/blub_1x64_w0-16.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/pig_1x128_w0-20.pth'))
+    # pretrained_ni2.load_state_dict(torch.load('shapeNets/skull_1x128_w0-20.pth'))
     # pretrained_ni2.load_state_dict(torch.load('shapeNets/witch_2x128_w0-30.pth'))
-    # pretrained_ni2.eval()
-    # pretrained_ni2.to(device)
+    pretrained_ni2.eval()
+    pretrained_ni2.to(device)
 
     dataset = SpaceTimePointCloudNI(
         datasets,
         sampling_config["samples_on_surface"],
-        # pretrained_ni=[pretrained_ni1, pretrained_ni2],
-        pretrained_ni=[pretrained_ni],
+        pretrained_ni=[pretrained_ni1, pretrained_ni2],
+        # pretrained_ni=[pretrained_ni],
         batch_size=parameter_dict["batch_size"],
         silent=False,
         device=device
@@ -261,7 +261,7 @@ if __name__ == "__main__":
         model.to(device=device)
 
     #use the weights of a trained i3d net
-    use_trained_i3d_weights = True
+    use_trained_i3d_weights = False
     if use_trained_i3d_weights:
         #layer_0 = model.net[0][0].weight[...,3].unsqueeze(-1)
         # i3d_weights = torch.load("shapeNets/dragon_2x256_w-60.pth")
@@ -320,8 +320,6 @@ if __name__ == "__main__":
             loss_fn = loss_constant
         elif loss == "loss_transport":
             loss_fn = loss_transport
-        elif loss == "loss_vector_field_morph":
-            loss_fn = loss_vector_field_morph
         elif loss == "loss_NFGP":
             loss_fn = loss_NFGP(pretrained_ni)
         elif loss == "loss_level_set":

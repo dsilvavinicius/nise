@@ -1,5 +1,5 @@
 {
-    "description": "SIREN Learning of the Armadillo mesh.",
+    "description": "SIREN Learning ...",
     "space_time": true,
     "num_epochs": 100001,
     "sampling_opts": {

@@ -4,21 +4,21 @@ network:
 
 training:
   n_epochs: 2001
-  checkpoints_at_every_epoch: 101
+  checkpoints_at_every_epoch: 1001
 
 loss:
   type: morphing_sirens
 
 training_data:
-  batchsize: 8000
+  batchsize: 2000
   timesampler:
     range: [-0.1, 0.1]
   mesh:
-    data/spot.ply:
-      ni: ni/spot_1x64_w0-16.pth
+    data/torus.ply:
+      ni: ni/torus_1x64_w0-16.pth
       omega_0: 16
-      t: -1
+      t: -0.1
     data/bob.ply:
       ni: ni/bob_1x64_w0-16.pth
       omega_0: 16
-      t: 1
+      t: 0.1
