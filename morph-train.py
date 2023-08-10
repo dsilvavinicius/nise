@@ -534,7 +534,8 @@ if __name__ == "__main__":
         running_loss = torch.zeros((1, 1), device=device)
         for k, v in loss.items():
             running_loss += v
-            writer.add_scalar(f"train/{k}_term", v.detach().item(), e)
+            if not args.time_benchmark:
+                writer.add_scalar(f"train/{k}_term", v.detach().item(), e)
             if k not in training_loss:
                 training_loss[k] = [v.detach().item()]
             else:

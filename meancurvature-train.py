@@ -495,7 +495,9 @@ if __name__ == '__main__':
     scale = float(config["loss"].get("scale", 1e-3))
     lossmeancurv = LossMeanCurvature(scale=scale)
 
-    checkpoint_times = config["training"].get("checkpoint_times", losstimes)
+    checkpoint_times = config["training"].get(
+        "checkpoint_times", [-1.0, 0.0, 1.0]
+    )
 
     updated_config = copy.deepcopy(config)
     updated_config["network"]["init_method"] = init_method
@@ -541,7 +543,8 @@ if __name__ == '__main__':
         running_loss = torch.zeros((1, 1), device=device)
         for k, v in loss.items():
             running_loss += v
-            writer.add_scalar(f"train/{k}_term", v.detach().item(), e)
+            if not args.time_benchmark:
+                writer.add_scalar(f"train/{k}_term", v.detach().item(), e)
             if k not in training_loss:
                 training_loss[k] = [v.detach().item()]
             else:
