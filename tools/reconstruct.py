@@ -10,7 +10,8 @@ import argparse
 import os
 import os.path as osp
 import torch
-from i4d.util import from_pth, reconstruct_at_times
+from i4d.model import from_pth
+from i4d.util import reconstruct_at_times
 
 
 if __name__ == "__main__":

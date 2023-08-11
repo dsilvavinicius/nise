@@ -8,32 +8,44 @@ import time
 import torch
 
 
-def create_mesh(
-    decoder,
-    filename="",
-    t=-1000, #time=-1000 means we are only in the space
-    N=256,
-    max_batch=64 ** 3,
-    offset=None,
-    scale=None,
-    device="cpu",
-    silent=False
-):
-    decoder.eval()
+def gen_mc_coordinate_grid(N: int, voxel_size: float, t: float = None,
+                           device: str = "cpu",
+                           voxel_origin: list = [-1, -1, -1]) -> torch.Tensor:
+    """Creates the coordinate grid for inference and marching cubes run.
 
-    # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = [-1, -1, -1]
-    voxel_size = 2.0 / (N - 1)
+    Parameters
+    ----------
+    N: int
+        Number of elements in each dimension. Total grid size will be N ** 3
 
+    voxel_size: number
+        Size of each voxel
+
+    t: float, optional
+        Reconstruction time. Required for space-time models. Default value is
+        None, meaning that time is not a model parameter
+
+    device: string, optional
+        Device to store tensors. Default is CPU
+
+    voxel_origin: list[number, number, number], optional
+        Origin coordinates of the volume. Must be the (bottom, left, down)
+        coordinates. Default is [-1, -1, -1]
+
+    Returns
+    -------
+    samples: torch.Tensor
+        A (N**3, 3) shaped tensor with samples' coordinates. If t is not None,
+        then the return tensor is has 4 columns instead of 3, with the last
+        column equalling `t`.
+    """
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
-    
-    sdf_coord = 3
-    if (t!=-1000):
-        sdf_coord = 4
 
+    sdf_coord = 3 if t is None else 4
     # (x,y,z,sdf) if we are not considering time
     # (x,y,z,t,sdf) otherwise
-    samples = torch.zeros(N ** 3, sdf_coord + 1, device=device)
+    samples = torch.zeros(N ** 3, sdf_coord + 1, device=device,
+                          requires_grad=False)
 
     # transform first 3 columns
     # to be the x, y, z index
@@ -46,11 +58,36 @@ def create_mesh(
     samples[:, 0] = (samples[:, 0] * voxel_size) + voxel_origin[2]
     samples[:, 1] = (samples[:, 1] * voxel_size) + voxel_origin[1]
     samples[:, 2] = (samples[:, 2] * voxel_size) + voxel_origin[0]
-    samples.requires_grad = False
 
-    #adding the time
-    if(t!=-1000):
+    # adding the time
+    if t is not None:
         samples[:, sdf_coord-1] = t
+
+    return samples
+
+
+def create_mesh(
+    decoder,
+    filename="",
+    t=None,
+    N=256,
+    max_batch=64 ** 3,
+    offset=None,
+    scale=None,
+    device="cpu",
+    silent=False
+):
+    decoder.eval()
+    # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not
+    # the middle
+    voxel_origin = [-1, -1, -1]
+    voxel_size = 2.0 / (N - 1)
+
+    samples = gen_mc_coordinate_grid(
+        N, voxel_size, t=t, device=device
+    )
+
+    sdf_coord = 3 if t is None else 4
 
     # samples[:, 0:sdf_coord-1]*=100 #for lipschitz reconstruction
 
@@ -59,8 +96,8 @@ def create_mesh(
 
     start = time.time()
     while head < num_samples:
-        #print(head)
-        sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
+        sample_subset = samples[head:min(head + max_batch, num_samples),
+                                0:sdf_coord]
 
         samples[head:min(head + max_batch, num_samples), sdf_coord] = (
             decoder(sample_subset)["model_out"]
@@ -96,96 +133,6 @@ def create_mesh(
     return verts, faces, normals, values
 
 
-def create_mesh_lipschitz(
-    decoder,
-    filename="",
-    t=-1000, #time=-1000 means we are only in the space
-    N=256,
-    max_batch=64 ** 3,
-    offset=None,
-    scale=None,
-    device="cpu",
-    silent=False
-):
-    decoder.eval()
-
-    # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin =[-1, -1, -1]
-    voxel_size = 2.0 / (N - 1)
-
-    overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
-    
-    sdf_coord = 3
-    if (t!=-1000):
-        sdf_coord = 4
-
-    # (x,y,z,sdf) if we are not considering time
-    # (x,y,z,t,sdf) otherwise
-    samples = torch.zeros(N ** 3, sdf_coord + 1, device=device)
-
-    # transform first 3 columns
-    # to be the x, y, z index
-    samples[:, 2] = overall_index % N
-    samples[:, 1] = (overall_index.long() / N) % N
-    samples[:, 0] = ((overall_index.long() / N) / N) % N
-
-    # transform first 3 columns
-    # to be the x, y, z coordinate
-    samples[:, 0] = (samples[:, 0] * voxel_size) + voxel_origin[2]
-    samples[:, 1] = (samples[:, 1] * voxel_size) + voxel_origin[1]
-    samples[:, 2] = (samples[:, 2] * voxel_size) + voxel_origin[0]
-    samples.requires_grad = False
-
-    #adding the time
-    if(t!=-1000):
-        samples[:, sdf_coord-1] = t
-
-    # samples[:, 0:3]*=10 #for lipschitz reconstruction
-
-    num_samples = N ** 3
-    head = 0
-
-    start = time.time()
-    while head < num_samples:
-        #print(head)
-        sample_subset = samples[head:min(head + max_batch, num_samples), 0: sdf_coord]
-
-        samples[head:min(head + max_batch, num_samples), sdf_coord] = (
-            decoder(sample_subset)["model_out"]
-            .squeeze()
-            .detach()
-            .cpu()
-        )
-        head += max_batch
-
-    sdf_values = samples[:, sdf_coord]
-    sdf_values = sdf_values.reshape(N, N, N)
-
-    end = time.time()
-    if not silent:
-        print(f"Sampling took: {end-start} s")
-
-    verts, faces, normals, values = convert_sdf_samples_to_ply(
-        sdf_values.data.cpu(),
-        voxel_origin,
-        voxel_size,
-        offset,
-        scale,
-    )
-
-    # if filename:
-    #     if not silent:
-    #         print(f"Saving mesh to {filename}")
-
-    #     save_ply(verts, faces, filename)
-
-    #     if not silent:
-    #         print("Done")
-
-    return verts, faces, normals, values
-
-
-
 def convert_sdf_samples_to_ply(
     pytorch_3d_sdf_tensor,
     voxel_grid_origin,
@@ -203,14 +150,17 @@ def convert_sdf_samples_to_ply(
 
     This function adapted from: https://github.com/RobotLocomotion/spartan
     """
-    numpy_3d_sdf_tensor = pytorch_3d_sdf_tensor.numpy()
+    if isinstance(pytorch_3d_sdf_tensor, torch.Tensor):
+        numpy_3d_sdf_tensor = pytorch_3d_sdf_tensor.detach().cpu().numpy()
+    else:
+        numpy_3d_sdf_tensor = pytorch_3d_sdf_tensor
 
     verts, faces, normals, values = np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0)
 
     # Check if the cubes contains the zero-level set
     level = 0.0
     if level < numpy_3d_sdf_tensor.min() or level > numpy_3d_sdf_tensor.max():
-        print(f"Surface level must be within volume data range.")
+        print("Surface level must be within volume data range.")
     else:
         verts, faces, normals, values = marching_cubes(
             numpy_3d_sdf_tensor, level, spacing=[voxel_size] * 3

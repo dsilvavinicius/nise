@@ -22,6 +22,148 @@ def first_layer_sine_init(m):
         m.weight.uniform_(-1 / num_input, 1 / num_input)
 
 
+def siren_v1_to_v2(model_in, check_equals=False):
+    """Converts the models trained using the old class to the new format.
+
+    Parameters
+    ----------
+    model_in: OrderedDict
+        Model trained by our old SIREN version (Sitzmann code).
+
+    check_equals: boolean, optional
+        Whether to check if the converted models weight match. By default this
+        is False.
+
+    Returns
+    -------
+    model_out: OrderedDict
+        The input model converted to a format recognizable by our version of
+        SIREN.
+
+    divergences: list[tuple[str, str]]
+        If `check_equals` is True, then this list contains the keys where the
+        original and converted model dictionaries are not equal. Else, this is
+        an empty list.
+
+    See Also
+    --------
+    `model.SIREN`
+    """
+    model_out = OrderedDict()
+    for k, v in model_in.items():
+        model_out[k[4:]] = v
+
+    divergences = []
+    if check_equals:
+        for k in model_in.keys():
+            test = model_in[k] == model_out[k[4:]]
+            if test.sum().item() != test.numel():
+                divergences.append((k, k[4:]))
+
+    return model_out, divergences
+
+
+def from_state_dict(weights: OrderedDict, device: str = "cpu", w0=1, ww=None):
+    """Builds a SIREN network with the topology and weights in `weights`.
+
+    Parameters
+    ----------
+    weights: OrderedDict
+        The input state_dict to use as reference.
+
+    device: str, optional
+        Device to load the weights. Default value is cpu.
+
+    w0: number, optional
+        Frequency parameter for the first layer. Default value is 1.
+
+    ww: number, optional
+        Frequency parameter for the intermediate layers. Default value is None,
+        we will assume that ww = w0 in this case
+
+    Returns
+    -------
+    model: nifm.model.SIREN
+        The NN model mirroring `weights` topology.
+
+    upgrade_to_v2: boolean
+        If `weights` was from an older version of SIREN, we convert them to our
+        format and set this to `True`, signaling this fact.
+    """
+    n_layers = len(weights) // 2
+    hidden_layer_config = [None] * (n_layers - 1)
+    keys = list(weights.keys())
+
+    bias_keys = [k for k in keys if "bias" in k]
+    i = 0
+    while i < (n_layers - 1):
+        k = bias_keys[i]
+        hidden_layer_config[i] = weights[k].shape[0]
+        i += 1
+
+    n_in_features = weights[keys[0]].shape[1]
+    n_out_features = weights[keys[-1]].shape[0]
+    model = SIREN(
+        n_in_features=n_in_features,
+        n_out_features=n_out_features,
+        hidden_layer_config=hidden_layer_config,
+        w0=w0, ww=ww, delay_init=True
+    )
+
+    # Loads the weights. Converts to version 2 if they are from the old version
+    # of SIREN.
+    upgrade_to_v2 = False
+    try:
+        model.load_state_dict(weights)
+    except RuntimeError:
+        print("Found weights from old version of SIREN. Converting to v2.")
+        new_weights, diff = siren_v1_to_v2(weights, True)
+        model.load_state_dict(new_weights)
+        upgrade_to_v2 = True
+
+    return model, upgrade_to_v2
+
+
+def from_pth(path, device="cpu", w0=1, ww=None):
+    """Builds a SIREN given a weights file.
+
+    Parameters
+    ----------
+    path: str
+        Path to the pth file.
+
+    device: str, optional
+        Device to load the weights. Default value is cpu.
+
+    w0: number, optional
+        Frequency parameter for the first layer. Default value is 1.
+
+    ww: number, optional
+        Frequency parameter for the intermediate layers. Default value is None,
+        we will assume that ww = w0 in this case.
+
+    Returns
+    -------
+    model: torch.nn.Module
+        The resulting model.
+
+    Raises
+    ------
+    FileNotFoundError if `path` points to a non-existing file.
+    """
+    if not osp.exists(path):
+        raise FileNotFoundError(f"Weights file not found at \"{path}\"")
+
+    weights = torch.load(path, map_location=torch.device(device))
+    model, upgraded_to_v2 = from_state_dict(
+        weights, device=device, w0=w0, ww=ww
+    )
+    if upgraded_to_v2:
+        torch.save(model.state_dict(), path.split(".")[0] + "_v2.pth")
+
+    return model.to(device=device)
+
+
 class SineLayer(nn.Module):
     """A Sine non-linearity layer.
     """
@@ -292,11 +434,34 @@ class SIREN(nn.Module):
         return self
 
 
-class lipmlp(nn.Module):
+class LipschitzMLP(nn.Module):
+    """Multi-layer Perceptron with Lipschitz Regularization [1].
 
+    Parameters
+    ----------
+    n_in_features: int
+        Number of input features.
+
+    n_out_features: int
+        Number of output features.
+
+    hidden_layer_config: list[int], optional
+        Number of neurons at each hidden layer of the network. The model will
+        have `len(hidden_layer_config)` hidden layers. Only used in during
+        model training. Default value is None.
+
+    w0: number, optional
+        Frequency multiplier for the Sine layers. Only useful for training the
+        model. Default value is 1.
+
+    References
+    ----------
+    [1] Liu, Hsueh-Ti Derek, et al. "Learning smooth neural functions via
+    lipschitz regularization." ACM SIGGRAPH 2022 Conference Proceedings. 2022
+    """
     def __init__(self, n_in_features, n_out_features, hidden_layer_config=[],
                  w0=30):
-        super().__init__()
+        super(LipschitzMLP, self).__init__()
 
         def init_W(size_out, size_in):
             W = torch.randn(size_out, size_in) * torch.sqrt(torch.Tensor([2 / size_in]))
@@ -328,7 +493,7 @@ class lipmlp(nn.Module):
         """
         absrowsum = torch.sum(torch.abs(W), axis=1)
         scale = torch.minimum(torch.Tensor([1.0]).cuda(), softplus_c/absrowsum)
-        return W * scale[:,None]
+        return W * scale[:, None]
 
     def get_lipschitz_loss(self):
         loss_lip = 1.0
@@ -343,7 +508,7 @@ class lipmlp(nn.Module):
         coords_org = x.clone().detach().requires_grad_(True)
         coords = coords_org
         for ii in range(len(self.params_W) - 1):
-            #W, b, c = self.params_net[ii]
+            # W, b, c = self.params_net[ii]
             W = self.params_W[ii]
             b = self.params_b[ii]
             c = self.params_c[ii]
