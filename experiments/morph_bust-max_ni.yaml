@@ -1,0 +1,27 @@
+network:
+  omega_0: 30
+  hidden_layer_nodes: [156, 128]
+  init_method: initial_condition
+
+training:
+  n_epochs: 2001
+  checkpoints_at_every_epoch: 200
+  checkpoint_times: [-0.1, -0.025, -0.05, 0, 0.05, 0.025, 0.1]
+
+loss:
+  type: morphing_sirens
+  times: [-0.1, 0.1]
+
+training_data:
+  batchsize: 20000
+  timesampler:
+    range: [-0.1, 0.1]
+  mesh:
+    data/max.ply:
+      ni: ni/max_new.pth
+      omega_0: 1
+      t: -0.1
+    data/bust.ply:
+      ni: ni/bust.pth
+      omega_0: 1
+      t: 0.1

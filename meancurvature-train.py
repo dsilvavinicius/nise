@@ -32,9 +32,10 @@ if __name__ == '__main__':
         " configuration file."
     )
     parser.add_argument(
-        "--init_method", "-i", default="",
-        help="Initialization method. Either standard (\"sitz\") or ours"
-        " (\"i3d\"). If left empty, fetches it from the configuration file."
+        "--init_method", "-i", action="store_true", default=False,
+        help="Initialization method for the model. If set, uses the first"
+        " initial condition for the morphing network weigths. By default,"
+        " uses SIREN's method."
     )
     parser.add_argument(
         "--seed", default=668123, type=int,
@@ -125,8 +126,8 @@ if __name__ == '__main__':
     model.zero_grad(set_to_none=True)
     model.reset_weights()
 
-    init_method = network_config.get("init_method", args.init_method)
-    if init_method == "i3d":
+    init_method = network_config.get("init_method", "sitz")
+    if init_method == "initial_condition":
         model.from_pretrained_initial_condition(torch.load(ni))
 
     if "timesampler" in training_data_config:

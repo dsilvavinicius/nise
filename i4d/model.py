@@ -265,6 +265,9 @@ class SIREN(nn.Module):
             Dictionary of tensors with the input coordinates under 'model_in'
             and the model output under 'model_out'.
         """
+
+        # WARNING: it is changing the values of the time coords, thus, we need
+        # to be careful in the loss function conditions
         if omegas:
             for k, v in omegas.items():
                 if k < 0 or k > x.shape[1]:

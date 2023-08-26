@@ -1,7 +1,7 @@
 network:
   omega_0: 40
   hidden_layer_nodes: [300, 300, 300]
-  init_method: i3d
+  init_method: initial_condition
 
 training:
   n_epochs: 1001

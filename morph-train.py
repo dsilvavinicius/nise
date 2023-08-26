@@ -32,6 +32,12 @@ if __name__ == "__main__":
         " configuration file."
     )
     parser.add_argument(
+        "--initial_condition", "-i", action="store_true", default=False,
+        help="Initialization method for the model. If set, uses the first"
+        " initial condition for the morphing network weigths. By default,"
+        " uses SIREN's method."
+    )
+    parser.add_argument(
         "--seed", default=668123, type=int,
         help="Seed for the random-number generator."
     )
@@ -116,6 +122,16 @@ if __name__ == "__main__":
     model.zero_grad(set_to_none=True)
     model.reset_weights()
 
+    init_method = network_config.get("init_method", "sitz")
+    if args.initial_condition:
+        init_method = "initial_condition"
+
+    if init_method == "initial_condition":
+        w0 = model.w0
+        model.update_omegas(1)
+        model.from_pretrained_initial_condition(torch.load(meshdata[0][1]))
+        model.update_omegas(w0)
+
     if "timesampler" in training_mesh_config:
         timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
         dataset.time_sampler = torch.distributions.uniform.Uniform(
@@ -156,6 +172,17 @@ if __name__ == "__main__":
     best_weigths = None
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
+
+    # Reconstruct without training
+    # meshpath = osp.join(
+    #     experimentpath, "reconstructions", "check_0"
+    # )
+    # os.makedirs(meshpath, exist_ok=True)
+    # reconstruct_with_curvatures(
+    #     model, checkpoint_times, meshpath, device=device,
+    #     resolution=256
+    # )
+    # model = model.train()
 
     start_training_time = time.time()
     for e in range(nsteps):
