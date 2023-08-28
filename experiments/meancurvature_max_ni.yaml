@@ -4,8 +4,9 @@ network:
   init_method: initial_condition
 
 training:
-  n_epochs: 2000
-  checkpoints_at_every_epoch: 1002
+  n_epochs: 5000
+  checkpoints_at_every_epoch: 1000
+  checkpoint_times: [-0.5, -0.2, 0, 0.4, 0.8]
 
 loss:
   type: meancurvature
