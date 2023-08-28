@@ -122,7 +122,7 @@ if __name__ == "__main__":
     model.zero_grad(set_to_none=True)
     model.reset_weights()
 
-    init_method = network_config.get("init_method", "sitz")
+    init_method = network_config.get("init_method", "siren")
     if args.initial_condition:
         init_method = "initial_condition"
 

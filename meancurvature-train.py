@@ -32,10 +32,10 @@ if __name__ == '__main__':
         " configuration file."
     )
     parser.add_argument(
-        "--init_method", "-i", action="store_true", default=False,
-        help="Initialization method for the model. If set, uses the first"
-        " initial condition for the morphing network weigths. By default,"
-        " uses SIREN's method."
+        "--initial_condition", "-i", action="store_true", default=False,
+        help="Initialization method for the model. If set, uses the initial"
+        " condition for the smoothing network weigths. By default, uses"
+        " SIREN's method."
     )
     parser.add_argument(
         "--seed", default=668123, type=int,
@@ -126,7 +126,10 @@ if __name__ == '__main__':
     model.zero_grad(set_to_none=True)
     model.reset_weights()
 
-    init_method = network_config.get("init_method", "sitz")
+    init_method = network_config.get("init_method", "siren")
+    if args.initial_condition:
+        init_method = "initial_condition"
+
     if init_method == "initial_condition":
         model.from_pretrained_initial_condition(torch.load(ni))
 
