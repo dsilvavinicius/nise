@@ -168,7 +168,7 @@ def loss_transport(X, gt):
     """
     gt_sdf = gt["sdf"]
     gt_normals = gt["normals"]
-    
+
     coords = X["model_in"]
     pred_sdf = X["model_out"]
 
@@ -176,13 +176,13 @@ def loss_transport(X, gt):
 
     # PDE constraints
     transport_constraint = transport_equation(grad)
-    
+
     #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
-    grad = grad[:,:,0:3] 
-    
+    grad = grad[:,:,0:3]
+
     # Initial-boundary constraints of the Eikonal equation at t=0
     sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad) 
+    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad)
     sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
     grad_constraint = eikonal_at_time_constraint(grad, gt_sdf)
 
@@ -371,7 +371,6 @@ class loss_level_set(torch.nn.Module):
         center1 = [0.0, 0.1, 0.05]
         spreads1 = [0.3,0.3,0.3]
 
-        # V = self.source_vector_field(x, center1, spreads1)
         V = self.source_vector_field(x, center1, spreads1)
 
         return V
@@ -382,7 +381,7 @@ class loss_level_set(torch.nn.Module):
         Z = x[...,2].unsqueeze(-1)
 
         vx = - 2. * Y * Z
-        vy = 0*Y
+        vy = torch.zeros_like(Y)  # 0.#0*Y
         vz =   2. * Y * X
         return torch.cat((vx,vy,vz),dim=-1)
 
@@ -399,19 +398,18 @@ class loss_level_set(torch.nn.Module):
 
 
     def level_set_equation(self, grad, x):
-        ft = grad[:,:,3].unsqueeze(-1)
+        # ft = grad[:,:,3].unsqueeze(-1)
+        ft = grad[:, 3].unsqueeze(-1)
         #V = self.twist_X_vector_field(x)
-        # V = self.twist_vector_field(x)
-        V = self.armadillo_fat_vector_field(x)
+        #V = self.twist_vector_field(x) #used in vectorfield_armadillo_ni.yaml
+        #V = self.armadillo_fat_vector_field(x)
 
-        #V = self.vector_field(x)
+        V = self.vector_field(x)
         dot = vector_dot(grad[...,0:3], V)
 
         return (ft + dot)**2
 
     def forward(self, X, gt):
-        gt_sdf = gt["sdf"]
-
         coords = X["model_in"]
         pred_sdf = X["model_out"]
 
@@ -426,17 +424,10 @@ class loss_level_set(torch.nn.Module):
         trained_model_in = trained_model['model_in']
         grad_trained_model = gradient(trained_model_out, trained_model_in).detach()
 
-        # Initial-boundary constraints of the Eikonal equation at t=0
-
+        # Initial condition at t=0
         time = coords[...,3].unsqueeze(-1)
-
-        # Initial-boundary constraints of the Eikonal equation at t=0
         sdf_constraint = torch.where( time == 0, (trained_model_out.detach() - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-        #sdf_constraint = torch.where( torch.abs(trained_model_out)<0.05, 1e1*sdf_constraint, sdf_constraint)
-
-        #grad_constraint = eikonal_constraint(grad).unsqueeze(-1)
-        #grad_constraint = torch.where( gt_sdf!=-1, grad_constraint, torch.zeros_like(pred_sdf))
-
+        
         normal_constraint = torch.where(
             time == 0,
             1 - F.cosine_similarity(grad[...,0:3], grad_trained_model, dim=-1)[..., None],
@@ -444,10 +435,9 @@ class loss_level_set(torch.nn.Module):
         )
 
         return {
-            "sdf_constraint": sdf_constraint.mean()*1e4,#1e3,
-            "normal_constraint": normal_constraint.mean()*1e1,
-           # "grad_constraint": grad_constraint.mean(),
-            "level_set_constraint": level_set_constraint.mean()*5e3,
+            "sdf_constraint": sdf_constraint.mean()*5e3,
+            "normal_constraint": normal_constraint.mean()*5e2,
+            "level_set_constraint": level_set_constraint.mean()*1e3,
         }
 
 

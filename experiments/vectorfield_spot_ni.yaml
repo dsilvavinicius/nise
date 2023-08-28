@@ -1,0 +1,24 @@
+network:
+  omega_0: 20
+  hidden_layer_nodes: [128, 128]
+
+training:
+  n_epochs: 10001
+  checkpoints_at_every_epoch: 500
+  checkpoint_times: [-0.4, 0.0, 0.4]
+
+loss:
+  type: levelset
+  vectorfield:
+    type: twist
+    other_params: none
+
+training_data:
+  batchsize: 6500
+  timesampler:
+    range: [-0.4, 0.4]
+  mesh:
+    data/spot.ply:
+      ni: ni/spot_1x64_w0-16.pth
+      omega_0: 16
+      t: 0.0
