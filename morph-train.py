@@ -8,14 +8,16 @@ import os
 import os.path as osp
 import time
 import sys
+import kaolin
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.loss import LossMorphingNI
+from i4d.meshing import create_mesh, save_ply
 from i4d.model import SIREN
-from i4d.util import create_output_paths, reconstruct_with_curvatures
+from i4d.util import create_output_paths
 
 
 if __name__ == "__main__":
@@ -59,6 +61,13 @@ if __name__ == "__main__":
         " are running a training time measurement. Disables writing to"
         " tensorboard, model checkpoints, best model serialization and mesh"
         " generation during training."
+    )
+    parser.add_argument(
+        "--kaolin", action="store_true", default=False, help="When saving"
+        " mesh checkpoints, use kaolin format, or simply save the PLY files"
+        " (default). Note that this respects the checkpoint configuration in"
+        " the experiment files, if no checkpoints are enabled, then nothing"
+        " will be saved."
     )
     args = parser.parse_args()
 
@@ -169,7 +178,7 @@ if __name__ == "__main__":
         yaml.dump(updated_config, f)
 
     best_loss = torch.inf
-    best_weigths = None
+    best_weights = None
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
 
@@ -183,6 +192,11 @@ if __name__ == "__main__":
     #     resolution=256
     # )
     # model = model.train()
+
+    if args.kaolin and not args.time_benchmark:
+        timelapse = kaolin.visualize.Timelapse(
+            osp.join(experimentpath, "kaolin")
+        )
 
     start_training_time = time.time()
     for e in range(nsteps):
@@ -221,26 +235,38 @@ if __name__ == "__main__":
 
         running_loss.backward()
         optim.step()
+
+        if e > WARMUP_STEPS and best_loss > running_loss.item():
+            best_weights = copy.deepcopy(model.state_dict())
+            best_loss = running_loss.item()
+
         if not args.time_benchmark:
             writer.add_scalar("train/loss", running_loss.detach().item(), e)
 
-            if e > WARMUP_STEPS and best_loss > running_loss.item():
-                best_weights = copy.deepcopy(model.state_dict())
-                best_loss = running_loss.item()
-
             if checkpoint_at and e and not e % checkpoint_at:
-                torch.save(
-                    model.state_dict(),
-                    osp.join(experimentpath, "models", f"checkpoint_{e}.pth")
-                )
-                meshpath = osp.join(
-                    experimentpath, "reconstructions", f"check_{e}"
-                )
-                os.makedirs(meshpath, exist_ok=True)
-                reconstruct_with_curvatures(
-                    model, checkpoint_times, meshpath, device=device,
-                    resolution=256
-                )
+                for i, t in enumerate(checkpoint_times):
+                    verts, faces, normals, _ = create_mesh(
+                        model,
+                        t=t,
+                        N=256,
+                        device=device
+                    )
+                    if args.kaolin:
+                        timelapse.add_mesh_batch(
+                            category=f"check_{i}",
+                            iteration=e // checkpoint_at,
+                            faces_list=[torch.from_numpy(faces.copy())],
+                            vertices_list=[torch.from_numpy(verts.copy())]
+                        )
+                    else:
+                        meshpath = osp.join(
+                            experimentpath, "reconstructions", f"check_{e}"
+                        )
+                        os.makedirs(meshpath, exist_ok=True)
+                        save_ply(
+                            verts, faces, osp.join(meshpath, f"time_{t}.ply")
+                        )
+
                 model = model.train()
 
             if not e % 100 and e > 0:

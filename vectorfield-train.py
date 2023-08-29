@@ -175,7 +175,7 @@ if __name__ == '__main__':
         yaml.dump(updated_config, f)
 
     best_loss = torch.inf
-    best_weigths = None
+    best_weights = None
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
 
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # )
     # model = model.train()
 
-    if args.kaolin:
+    if args.kaolin and not args.time_benchmark:
         timelapse = kaolin.visualize.Timelapse(
             osp.join(experimentpath, "kaolin")
         )
@@ -232,12 +232,13 @@ if __name__ == '__main__':
 
         running_loss.backward()
         optim.step()
+
+        if e > WARMUP_STEPS and best_loss > running_loss.item():
+            best_weights = copy.deepcopy(model.state_dict())
+            best_loss = running_loss.item()
+
         if not args.time_benchmark:
             writer.add_scalar("train/loss", running_loss.detach().item(), e)
-
-            if e > WARMUP_STEPS and best_loss > running_loss.item():
-                best_weights = copy.deepcopy(model.state_dict())
-                best_loss = running_loss.item()
 
             if checkpoint_at and e and not e % checkpoint_at:
                 for i, t in enumerate(checkpoint_times):
