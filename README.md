@@ -11,7 +11,7 @@
 [3] University of Coimbra (UC)
 [4] University of the Sinos Valley (UNISINOS)
 
-This is the official implementation of "Neural Implicit Surface Evolution".
+This is the official implementation of "Neural Implicit Surface Evolution", published on [arXiv](https://arxiv.org/abs/2201.09636) and to appear at the Proceedings of ICCV 2023.
 
 ## Getting started
 
@@ -23,43 +23,47 @@ This is the official implementation of "Neural Implicit Surface Evolution".
 4. [MeshLab](https://www.meshlab.net/)
 5. [NVIDIA Kaolin](https://github.com/NVIDIAGameWorks/kaolin/)
 
+If using Linux, or macOS, these programs should be available through the package manager, or Homebrew.
+
 ### Code organization
+The common code is contained in the `nise` package. Inside the respective folder, there are the following files:
 * `dataset.py` - contains the sampling and data classes
 * `diff_operators.py` - implementation of differential operators (gradient, hessian, jacobian, curvatures)
 * `loss.py` - contains loss functions for different experimental settings
-* `main.py` - main function and point-of-entry to our code
 * `meshing.py` - mesh creation through marching cubes
 * `model.py` - networks and layers implementations
 * `util.py` - miscelaneous functions and utilities
 
 Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code.
+* `discrete_smoothing.py` -
+* `enlarge_networks.py` - studying the effects of increasing network width in the training results
+* `lipschitz_exp.py` -
+* `mean_curvature_scale.py` - experiments with different values for the mean curvature equation scale parameter
+* `point_sample_proportions.py` - experiments with the proportions of points drawn from the surface, off-surface and along time
+* `smoothing.py` -
+* `training_time_intervals.py` - studies with varying time-intervals for training
 
-* `comparison_analytic.py` - comparison experiments of RBF, SIREN and our approach for analytic models of a sphere and torus
-* `comparison_ply.py` - comparison experiments of RBF, SIREN and our approach for PLY models
-* `sdf_for_n_iters.py` - Experiments with intermitent querying of off-surface points. Both to speed-up the training and test the influence of generating the off-surface points at each iteration.
-
-In the `tools` folder, there are two scripts:
-
-* `estimate_mesh_curvatures.py`: Given a trained model (pth) and the original mesh, we estimate the vertex curvatures using the trained model.
-* `reconstruct.py`: Given a trained model (pth) reconstructs the mesh using marching cubes.
-
-If using Linux, or macOS, these programs should be available through the package manager, or Homebrew.
+The main training and reconstruction scripts are in the repository's root folder:
+* `meancurvature-train.py` -
+* `morph-train.py` -
+* `reconstruct.py` - given a trained model (pth) reconstructs the mesh using marching cubes at values `t` given by the user
+* `vectorfield-train.py` -
 
 ### Setup and sample run
 
 1. Open a terminal (or Git Bash if using Windows)
-2. Clone this repository: `git clone git@github.com:dsilvavinicius/i4d.git`
-3. Enter project folder: `cd i4d`
+2. Clone this repository: `git clone git@github.com:dsilvavinicius/nise.git`
+3. Enter project folder: `cd nise`
 4. Setup project dependencies via conda
 ```
 conda env create -f environment.yml
-conda activate i4d
+conda activate nise
 pip install -e .
 ```
 or, if using pyenv (with pyenv-virtualenv):
 ```
-pyenv virtualenv 3.9.9 i4d
-pyenv local i4d
+pyenv virtualenv 3.9.9 nise
+pyenv local nise
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -79,7 +83,14 @@ Alternatively, on Linux and macOS systems, steps 3 (except the `activate` comman
 ## Citation
 If you find our work useful in your research, please cite:
 ```
-Bibtex here!
+@misc{novello2023neural,
+      title={Neural Implicit Surface Evolution},
+      author={Tiago Novello and Vinicius da Silva and Guilherme Schardong and Luiz Schirmer and Helio Lopes and Luiz Velho},
+      year={2023},
+      eprint={2201.09636},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
 ```
 
 ## Contact
