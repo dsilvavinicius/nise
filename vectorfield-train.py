@@ -8,12 +8,14 @@ import os
 import os.path as osp
 import time
 import sys
+import kaolin
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.loss import loss_level_set
+from i4d.meshing import create_mesh
 from i4d.model import SIREN, from_pth
 from i4d.util import create_output_paths, reconstruct_with_curvatures
 
@@ -53,6 +55,13 @@ if __name__ == '__main__':
         " are running a training time measurement. Disables writing to"
         " tensorboard, model checkpoints, best model serialization and mesh"
         " generation during training."
+    )
+    parser.add_argument(
+        "--kaolin", action="store_true", default=False, help="When saving"
+        " mesh checkpoints, use kaolin format, or simply save the PLY files"
+        " (default). Note that this respects the checkpoint configuration in"
+        " the experiment files, if no checkpoints are enabled, then nothing"
+        " will be saved."
     )
     args = parser.parse_args()
 
@@ -181,6 +190,11 @@ if __name__ == '__main__':
     # )
     # model = model.train()
 
+    if args.kaolin:
+        timelapse = kaolin.visualize.Timelapse(
+            osp.join(experimentpath, "kaolin")
+        )
+
     start_training_time = time.time()
     for e in range(nsteps):
         data = dataset[e]
@@ -229,11 +243,31 @@ if __name__ == '__main__':
                 meshpath = osp.join(
                     experimentpath, "reconstructions", f"check_{e}"
                 )
-                os.makedirs(meshpath, exist_ok=True)
-                reconstruct_with_curvatures(
-                    model, checkpoint_times, meshpath, device=device,
-                    resolution=256
-                )
+                if args.kaolin:
+                    for i, t in enumerate(checkpoint_times):
+                        verts, faces, normals, _ = create_mesh(
+                            model,
+                            t=t,  # time instant for 4d SIREN function
+                            N=256,
+                            device=device
+                        )
+
+                        # adding checkpoint to kaolin
+                        tensor_faces = torch.from_numpy(faces.copy())
+                        tensor_verts = torch.from_numpy(verts.copy())
+                        timelapse.add_mesh_batch(
+                            category=f"check_{i}",
+                            iteration=e//checkpoint_at,
+                            faces_list=[tensor_faces],
+                            vertices_list=[tensor_verts]
+                        )
+                else:
+                    os.makedirs(meshpath, exist_ok=True)
+                    reconstruct_with_curvatures(
+                        model, checkpoint_times, meshpath, device=device,
+                        resolution=256
+                    )
+
                 model = model.train()
 
             if not e % 100 and e > 0:
