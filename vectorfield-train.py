@@ -15,9 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 import yaml
 from i4d.dataset import SpaceTimePointCloudNI
 from i4d.loss import loss_level_set
-from i4d.meshing import create_mesh
+from i4d.meshing import create_mesh, save_ply
 from i4d.model import SIREN, from_pth
-from i4d.util import create_output_paths, reconstruct_with_curvatures
+from i4d.util import create_output_paths
 
 
 if __name__ == '__main__':
@@ -240,33 +240,28 @@ if __name__ == '__main__':
                 best_loss = running_loss.item()
 
             if checkpoint_at and e and not e % checkpoint_at:
-                meshpath = osp.join(
-                    experimentpath, "reconstructions", f"check_{e}"
-                )
-                if args.kaolin:
-                    for i, t in enumerate(checkpoint_times):
-                        verts, faces, normals, _ = create_mesh(
-                            model,
-                            t=t,  # time instant for 4d SIREN function
-                            N=256,
-                            device=device
-                        )
-
-                        # adding checkpoint to kaolin
-                        tensor_faces = torch.from_numpy(faces.copy())
-                        tensor_verts = torch.from_numpy(verts.copy())
+                for i, t in enumerate(checkpoint_times):
+                    verts, faces, normals, _ = create_mesh(
+                        model,
+                        t=t,
+                        N=256,
+                        device=device
+                    )
+                    if args.kaolin:
                         timelapse.add_mesh_batch(
                             category=f"check_{i}",
-                            iteration=e//checkpoint_at,
-                            faces_list=[tensor_faces],
-                            vertices_list=[tensor_verts]
+                            iteration=e // checkpoint_at,
+                            faces_list=[torch.from_numpy(faces.copy())],
+                            vertices_list=[torch.from_numpy(verts.copy())]
                         )
-                else:
-                    os.makedirs(meshpath, exist_ok=True)
-                    reconstruct_with_curvatures(
-                        model, checkpoint_times, meshpath, device=device,
-                        resolution=256
-                    )
+                    else:
+                        meshpath = osp.join(
+                            experimentpath, "reconstructions", f"check_{e}"
+                        )
+                        os.makedirs(meshpath, exist_ok=True)
+                        save_ply(
+                            verts, faces, osp.join(meshpath, f"time_{t}.ply")
+                        )
 
                 model = model.train()
 
