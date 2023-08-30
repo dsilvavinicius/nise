@@ -5,19 +5,19 @@ network:
 training:
   n_epochs: 10001
   checkpoints_at_every_epoch: 500
-  checkpoint_times: [-0.4, 0.0, 0.4]
+  checkpoint_times: [-0.8, 0.0, 0.8]
 
 loss:
   type: levelset
-  centers : [[-0.5, 0.4, 0.0], [0.2,-0.2, 0.0]]
-  spreads : [[ 0.3, 0.3, 0.3], [0.3, 0.3, 0.3]]
+  centers : [[-0.4, 0.2, 0.0]]
+  spreads : [[ 0.2, 0.2, 0.2]]
 
 training_data:
   batchsize: 6500
   timesampler:
-    range: [-0.4, 0.4]
+    range: [-0.8, 0.8]
   mesh:
-    data/spot.ply:
-      ni: ni/spot_1x64_w0-16.pth
+    data/bob.ply:
+      ni: ni/bob_1x64_w0-16.pth
       omega_0: 16
       t: 0.0

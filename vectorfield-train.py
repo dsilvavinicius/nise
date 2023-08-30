@@ -13,13 +13,13 @@ try:
 except ImportError:
     KAOLIN_AVAILABLE = False
 else:
-    KAOLIN_AVALIABLE = True
+    KAOLIN_AVAILABLE = True
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from nise.dataset import SpaceTimePointCloudNI
-from nise.loss import loss_level_set
+from nise.loss import LossVectorField
 from nise.meshing import create_mesh, save_ply
 from nise.model import SIREN, from_pth
 from nise.util import create_output_paths
@@ -162,8 +162,13 @@ if __name__ == '__main__':
         "n_int_times", batchsize - (n_on_surface + n_off_surface)
     )
 
-    scale = float(config["loss"].get("scale", 1e-3))
-    lossvf = loss_level_set(from_pth(ni, w0=training_mesh_config[mesh].get("omega_0", 1)))
+    centers = config["loss"]["centers"]
+    spreads = config["loss"]["spreads"]
+    lossvf = LossVectorField(
+        from_pth(ni, w0=training_mesh_config[mesh].get("omega_0", 1)),
+        centers,
+        spreads
+    )
 
     checkpoint_times = config["training"].get(
         "checkpoint_times", [-1.0, 0.0, 1.0]

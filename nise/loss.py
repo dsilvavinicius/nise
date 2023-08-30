@@ -334,12 +334,15 @@ class loss_NFGP(torch.nn.Module):
         }
 
 
-class loss_level_set(torch.nn.Module):
-    def __init__(self, trained_model):
+class LossVectorField(torch.nn.Module):
+    def __init__(self, trained_model, centers, spreads):
         super().__init__()
         # Define the model.
         self.model = trained_model
         self.model.cuda()
+
+        self.centers = centers
+        self.spreads = spreads 
 
     def source_vector_field(self,x, center = [0,0,0], spreads = [5,5,5] ):
         X = x[...,0].unsqueeze(-1)
@@ -354,59 +357,19 @@ class loss_level_set(torch.nn.Module):
 
         return gaussian*torch.cat((vx,vy,vz),dim=-1)
 
-    def vector_field(self,x):
-        # center1 = [-0.4, 0.2, 0.0]
-        # spreads1 = [0.2,0.2,0.2]
-        center1 = [-0.5, 0.4, 0.0]
-        center2 = [0.2, -0.2, 0.0]
-        spreads1 = [0.3,0.3,0.3]
-
-        # V = self.source_vector_field(x, center1, spreads1)
-        V = self.source_vector_field(x, center1, spreads1) - self.source_vector_field(x, center2, spreads1)
-
-        return V
-
-    def armadillo_fat_vector_field(self,x):
-        # center1 = [-0.4, 0.2, 0.0]
-        # spreads1 = [0.2,0.2,0.2]
-        center1 = [0.0, 0.1, 0.05]
-        spreads1 = [0.3,0.3,0.3]
-
-        V = self.source_vector_field(x, center1, spreads1)
-
-        return V
-
-    def twist_vector_field(self,x):
-        X = x[...,0].unsqueeze(-1)
-        Y = x[...,1].unsqueeze(-1)+1
-        Z = x[...,2].unsqueeze(-1)
-
-        vx = - 2. * Y * Z
-        vy = torch.zeros_like(Y)  # 0.#0*Y
-        vz =   2. * Y * X
-        return torch.cat((vx,vy,vz),dim=-1)
-
-
-    def twist_X_vector_field(self,x):
-        X = x[...,0].unsqueeze(-1)
-        Y = x[...,1].unsqueeze(-1)
-        Z = x[...,2].unsqueeze(-1)
-
-        vy = - 2. * X * Z
-        vx = 0*X
-        vz =   2. * X * Y
-        return torch.cat((vx,vy,vz),dim=-1)
-
 
     def level_set_equation(self, grad, x):
-        # ft = grad[:,:,3].unsqueeze(-1)
-        ft = grad[:, 3].unsqueeze(-1)
-        #V = self.twist_X_vector_field(x)
-        #V = self.twist_vector_field(x) #used in vectorfield_armadillo_ni.yaml
-        #V = self.armadillo_fat_vector_field(x)
+        
+        # time derivative of the network
+        ft = grad[:, -1].unsqueeze(-1)
 
-        V = self.vector_field(x)
-        dot = vector_dot(grad[...,0:3], V)
+        # defining the vector fields using gaussians        
+        V = torch.zeros_like(x[..., :-1])
+        for center, spread in zip(self.centers, self.spreads):
+            V += self.source_vector_field(x, center, spread)
+
+        # creating the corresponding level set equation
+        dot = vector_dot(grad[...,:-1], V)
 
         return (ft + dot)**2
 
