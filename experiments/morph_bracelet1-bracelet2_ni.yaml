@@ -16,11 +16,11 @@ training_data:
   timesampler:
     range: [-0.1, 0.1]
   mesh:
-    data/obj1.ply:
-      ni: ni/obj1.pth
+    data/bracelet1.ply:
+      ni: ni/bracelet1.pth
       omega_0: 1
       t: -0.1
-    data/obj2.ply:
-      ni: ni/obj2.pth
+    data/bracelet2.ply:
+      ni: ni/bracelet2.pth
       omega_0: 1
       t: 0.1
