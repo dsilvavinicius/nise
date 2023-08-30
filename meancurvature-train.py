@@ -8,7 +8,12 @@ import os
 import os.path as osp
 import time
 import sys
-import kaolin
+try:
+    import kaolin
+except ImportError:
+    KAOLIN_AVAILABLE = False
+else:
+    KAOLIN_AVAILABLE = True
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -190,7 +195,11 @@ if __name__ == '__main__':
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
 
-    if args.kaolin and not args.time_benchmark:
+    if not KAOLIN_AVAILABLE and args.kaolin:
+        print("Kaolin was selected but is not available. Switching to the"
+              " usual checkpoint saving.")
+
+    if args.kaolin and KAOLIN_AVAILABLE and not args.time_benchmark:
         timelapse = kaolin.visualize.Timelapse(
             osp.join(experimentpath, "kaolin")
         )
@@ -248,7 +257,7 @@ if __name__ == '__main__':
                         N=256,
                         device=device
                     )
-                    if args.kaolin:
+                    if KAOLIN_AVAILABLE and args.kaolin:
                         timelapse.add_mesh_batch(
                             category=f"check_{i}",
                             iteration=e // checkpoint_at,
