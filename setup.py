@@ -5,9 +5,13 @@ from setuptools import setup
 
 
 setup(
-    name="i4d",
-    version="0.0.2",
-    description="Neural Implicit Surface Evolution",
-    author="The Deep Implicits Group",
-    packages=["i4d"],
+    name="nise",
+    version="1.0.0",
+    description="Neural Implicit Surface Evolution -- Official implementation",
+    author="Tiago Novello, Vinicius da Silva, Guilherme Schardong,"
+    " Luiz Schirmer, Helio Lopes, Luiz Velho",
+    maintainer="Tiago Novelo, Guilherme Schardong",
+    maintainer_email="tiago.novello90@gmail.com, guilherme.schardong@isr.uc.pt",
+    packages=["nise"],
+    url=""
 )
