@@ -18,11 +18,11 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
-from i4d.dataset import SpaceTimePointCloudNI
-from i4d.loss import loss_level_set
-from i4d.meshing import create_mesh, save_ply
-from i4d.model import SIREN, from_pth
-from i4d.util import create_output_paths
+from nise.dataset import SpaceTimePointCloudNI
+from nise.loss import loss_level_set
+from nise.meshing import create_mesh, save_ply
+from nise.model import SIREN, from_pth
+from nise.util import create_output_paths
 
 
 if __name__ == '__main__':

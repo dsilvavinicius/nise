@@ -1,5 +1,6 @@
-'''From the DeepSDF repository https://github.com/facebookresearch/DeepSDF
-'''
+# coding: utf-8
+
+"""From the DeepSDF repository https://github.com/facebookresearch/DeepSDF"""
 
 import numpy as np
 import plyfile

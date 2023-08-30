@@ -286,7 +286,7 @@ class SIREN(nn.Module):
 
         Returns
         -------
-        self: i4d.model.SIREN
+        self: nise.model.SIREN
             The network.
         """
         self.net[0].apply(first_layer_sine_init)

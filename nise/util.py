@@ -8,8 +8,8 @@ import shutil
 import numpy as np
 import torch
 from warnings import warn
-from i4d.diff_operators import gradient, mean_curvature
-from i4d.meshing import create_mesh, save_ply
+from nise.diff_operators import gradient, mean_curvature
+from nise.meshing import create_mesh, save_ply
 
 
 def create_output_paths(checkpoint_path, experiment_name, overwrite=True):
@@ -66,7 +66,7 @@ def reconstruct_at_times(model, times, meshpath, resolution=256, device="cpu"):
 
     See Also
     --------
-    i4d.meshing.create_mesh
+    nise.meshing.create_mesh
     """
     model = model.eval()
     with torch.no_grad():

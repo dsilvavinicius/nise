@@ -2,7 +2,8 @@
 
 import torch
 from torch.functional import F
-from i4d.diff_operators import divergence, gradient, mean_curvature, vector_dot
+from nise.diff_operators import (divergence, gradient, mean_curvature,
+                                 vector_dot)
 
 
 def on_surface_sdf_constraint(gt_sdf, pred_sdf):
@@ -427,7 +428,7 @@ class loss_level_set(torch.nn.Module):
         # Initial condition at t=0
         time = coords[...,3].unsqueeze(-1)
         sdf_constraint = torch.where( time == 0, (trained_model_out.detach() - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-        
+
         normal_constraint = torch.where(
             time == 0,
             1 - F.cosine_similarity(grad[...,0:3], grad_trained_model, dim=-1)[..., None],
