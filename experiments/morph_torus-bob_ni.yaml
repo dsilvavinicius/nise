@@ -9,7 +9,6 @@ training:
 
 loss:
   type: morphing_sirens
-  times: [-0.1, 0.1]
 
 training_data:
   batchsize: 8000

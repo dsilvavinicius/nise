@@ -103,7 +103,9 @@ if __name__ == "__main__":
         batchsize = args.batchsize
 
     meshdata = []
+    ictimes = []
     for meshpath, data in training_mesh_config.items():
+        ictimes.append(data['t'])
         meshdata.append((meshpath, data["ni"], data['t'], data["omega_0"]))
 
     dataset = SpaceTimePointCloudNI(meshdata, batchsize)
@@ -166,10 +168,9 @@ if __name__ == "__main__":
     n_int_times = training_data_config.get("n_int_times", batchsize - (n_on_surface + n_off_surface))
 
     allni = [vertni[1] for vertni in dataset.vertices_ni]
-    losstimes = config["loss"].get("times", [-1.0, 1.0])
-    lossmorph = LossMorphingNI(allni, losstimes)
+    lossmorph = LossMorphing(allni, ictimes)
 
-    checkpoint_times = training_config.get("checkpoint_times", losstimes)
+    checkpoint_times = training_config.get("checkpoint_times", ictimes)
 
     updated_config = copy.deepcopy(config)
     updated_config["network"]["init_method"] = "siren"
