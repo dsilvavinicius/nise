@@ -134,11 +134,13 @@ if __name__ == '__main__':
     model.zero_grad(set_to_none=True)
     # w0 = model.w0
     # model.update_omegas(1)
-    #model.from_pretrained_initial_condition(torch.load(ni))
+    # model.from_pretrained_initial_condition(torch.load(ni))
     # model.update_omegas(w0)
 
     if "timesampler" in training_data_config:
-        timerange = training_data_config["timesampler"].get("range", [-1.0, 1.0])
+        timerange = training_data_config["timesampler"].get(
+            "range", [-1.0, 1.0]
+        )
         dataset.time_sampler = torch.distributions.uniform.Uniform(
             timerange[0], timerange[1]
         )
@@ -165,9 +167,10 @@ if __name__ == '__main__':
     centers = config["loss"]["centers"]
     spreads = config["loss"]["spreads"]
     lossvf = LossVectorField(
-        from_pth(ni, w0=training_mesh_config[mesh].get("omega_0", 1)),
+        dataset.vertices_ni[0][1],
         centers,
-        spreads
+        spreads,
+        initial_condition_time=training_mesh_config[mesh]['t']
     )
 
     checkpoint_times = config["training"].get(

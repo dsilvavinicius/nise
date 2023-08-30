@@ -19,7 +19,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from nise.dataset import SpaceTimePointCloudNI
-from nise.loss import LossMorphingNI
+from nise.loss import LossMorphing
 from nise.meshing import create_mesh, save_ply
 from nise.model import SIREN
 from nise.util import create_output_paths
