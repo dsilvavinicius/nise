@@ -1,0 +1,23 @@
+network:
+  omega_0: 16
+  hidden_layer_nodes: [128, 128]
+  init_method: initial_condition
+
+training:
+  n_epochs: 1001
+  checkpoints_at_every_epoch: 100
+  checkpoint_times: [-1.0, -0.5, 0.0, 0.5, 1.0]
+
+loss:
+  type: meancurvature
+  scale: 2e-2
+
+training_data:
+  batchsize: 40000
+  timesampler:
+    range: [-1.0, 1.0]
+  mesh:
+    data/dumbbell.ply:
+      ni: ni/dumbbell_1x64_w0-16.pth
+      omega_0: 16
+      t: -1.0

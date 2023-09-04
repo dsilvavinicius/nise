@@ -1,0 +1,23 @@
+network:
+  omega_0: 30
+  hidden_layer_nodes: [256, 256, 256]
+  init_method: initial_condition
+
+training:
+  n_epochs: 1001
+  checkpoints_at_every_epoch: 200
+  checkpoint_times: [-0.2, 0, 0.2, 0.4, 0.8]
+
+loss:
+  type: meancurvature
+  scale: 1e-3
+
+training_data:
+  batchsize: 60000
+  timesampler:
+    range: [-0.2, 0.8]
+  mesh:
+    data/bunny.ply:
+      ni: ni/bunny_2x256_w-30.pth
+      omega_0: 30
+      t: 0
