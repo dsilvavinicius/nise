@@ -19,10 +19,11 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from nise.dataset import SpaceTimePointCloudNI
+from nise.diff_operators import gradient
 from nise.loss import LossMeanCurvature
 from nise.meshing import create_mesh, save_ply
 from nise.model import SIREN
-from nise.util import create_output_paths
+from nise.util import create_output_paths, estimate_differential_properties
 
 
 if __name__ == '__main__':
@@ -122,12 +123,7 @@ if __name__ == '__main__':
         print("Checkpoints disabled")
 
     print(f"Total # of training steps = {nsteps}")
-
-    network_config = config["network"]
-    model = SIREN(4, 1, network_config["hidden_layer_nodes"],
-                  w0=network_config["omega_0"], delay_init=True).to(device)
-    print(model)
-
+   
     experiment = osp.split(args.experiment_config)[-1].split('.')[0]
     experimentpath = create_output_paths(
         "results",
@@ -137,15 +133,24 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(osp.join(experimentpath, 'summaries'))
 
-    model.zero_grad(set_to_none=True)
-    model.reset_weights()
+    network_config = config["network"]
 
     init_method = network_config.get("init_method", "siren")
     if args.initial_condition:
         init_method = "initial_condition"
 
     if init_method == "initial_condition":
+        model = SIREN(4, 1, network_config["hidden_layer_nodes"],
+            w0=w0, delay_init=True).to(device)
         model.from_pretrained_initial_condition(torch.load(ni))
+        model.update_omegas(w0=network_config["omega_0"])
+    else:
+        model = SIREN(4, 1, network_config["hidden_layer_nodes"],
+            w0=network_config["omega_0"], delay_init=False).to(device)
+
+    print(model)
+
+    model.zero_grad(set_to_none=True)
 
     if "timesampler" in training_data_config:
         timerange = training_data_config["timesampler"].get("range", [-1.0, 1.0])
@@ -250,13 +255,15 @@ if __name__ == '__main__':
             writer.add_scalar("train/loss", running_loss.detach().item(), e)
 
             if checkpoint_at and e and not e % checkpoint_at:
+                attrs = [("nx", "f4"), ("ny", "f4"), ("nz", "f4"), ("quality", "f4")]
                 for i, t in enumerate(checkpoint_times):
-                    verts, faces, normals, _ = create_mesh(
-                        model,
-                        t=t,
-                        N=256,
-                        device=device
-                    )
+                    with torch.no_grad():
+                        verts, faces, _, _ = create_mesh(
+                            model,
+                            t=t,
+                            N=400,
+                            device=device
+                        )
                     if KAOLIN_AVAILABLE and args.kaolin:
                         timelapse.add_mesh_batch(
                             category=f"check_{i}",
@@ -265,12 +272,21 @@ if __name__ == '__main__':
                             vertices_list=[torch.from_numpy(verts.copy())]
                         )
                     else:
+                        model.eval()
                         meshpath = osp.join(
                             experimentpath, "reconstructions", f"check_{e}"
                         )
                         os.makedirs(meshpath, exist_ok=True)
+
+                        verts = torch.from_numpy(verts).requires_grad_(False)
+                        coords = torch.cat((verts, t * torch.ones_like(verts[..., :1])), dim=1).squeeze(0).to(device).requires_grad_(False)
+                        verts = estimate_differential_properties(
+                            model, coords, with_curvs=True, batchsize=10000,
+                            device=device
+                        )
+
                         save_ply(
-                            verts, faces, osp.join(meshpath, f"time_{t}.ply")
+                            verts, faces, osp.join(meshpath, f"time_{t}.ply"), vertex_attributes=attrs
                         )
 
                 model = model.train()
