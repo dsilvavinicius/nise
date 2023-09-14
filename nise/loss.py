@@ -192,8 +192,8 @@ class LossMeanCurvature(torch.nn.Module):
         )
 
         return {
-            "sdf_constraint": sdf_constraint.mean() * 2e3,  # 1e3
-            "normal_constraint": normal_constraint.mean() * 1e1,
+            "sdf_constraint": sdf_constraint.mean() * 2e3, # 1e3
+            "normal_constraint": normal_constraint.mean() * 1e1, #3e1
             "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
         }
 
