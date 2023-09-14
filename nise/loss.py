@@ -26,25 +26,6 @@ def off_surface_sdf_constraint(gt_sdf, pred_sdf):
     return torch.where(gt_sdf != 0, result, torch.zeros_like(pred_sdf))
 
 
-def off_surface_without_sdf_constraint(gt_sdf, pred_sdf, radius: float = 1e2):
-    """
-    This function penalizes the pred_sdf of points in gt_sdf!=0
-    Used in SIREN's paper
-    """
-    return torch.where(
-           gt_sdf == 0,
-           torch.zeros_like(pred_sdf),
-           torch.exp(-radius * torch.abs(pred_sdf))
-        )
-
-
-def eikonal_constraint(grad):
-    """
-    This function forces the gradient of the sdf to be unitary: Eikonal Equation
-    """
-    return (grad.norm(dim=-1) - 1.) ** 2
-
-
 def eikonal_at_time_constraint(grad, gt_sdf):
     """
     This function forces the space-gradient of the SIREN function to be
@@ -84,20 +65,6 @@ def transport_equation(grad):
     fz = grad[:, :, 2].unsqueeze(-1)
 
     return (ft + (fy + fz))**2
-
-
-def mean_curvature_equation(grad, x, scale: float = 1e-8):
-    # Partial derivative of the SIREN function f with respect to the time t
-    ft = grad[..., 3].unsqueeze(-1)
-
-    # Gradient of the SIREN function f with respect to the space (x,y,z)
-    grad = grad[..., :3]
-    grad_norm = torch.norm(grad, dim=-1).unsqueeze(-1)
-    unit_grad = grad/grad_norm
-    div = divergence(unit_grad, x)
-
-    return (ft - scale * grad_norm * div)**2
-    # return torch.abs(ft - grad_norm*div)
 
 
 def loss_transport(X, gt):
@@ -148,6 +115,19 @@ def loss_transport(X, gt):
     }
 
 
+def mean_curvature_equation(grad, x, scale: float = 1e-8):
+    # Partial derivative of the SIREN function f with respect to the time t
+    ft = grad[..., 3].unsqueeze(-1)
+
+    # Gradient of the SIREN function f with respect to the space (x,y,z)
+    grad = grad[..., :3]
+    grad_norm = torch.norm(grad, dim=-1).unsqueeze(-1)
+    unit_grad = grad/grad_norm
+    div = divergence(unit_grad, x)
+
+    return (ft - scale * grad_norm * div)**2
+
+
 class LossMeanCurvature(torch.nn.Module):
     def __init__(self, scale: float = 0.001):
         super(LossMeanCurvature, self).__init__()
@@ -171,10 +151,6 @@ class LossMeanCurvature(torch.nn.Module):
         # the space: (fx, fy, fz)
         grad = grad[..., 0:3]
 
-        # grad_len = grad.norm(dim=-1).unsqueeze(-1)
-        # mean_curvature_constraint = torch.where(grad_len<10. , mean_curvature_constraint, torch.zeros_like(mean_curvature_constraint))
-        # mean_curvature_constraint = torch.where(grad_len>1e-3, mean_curvature_constraint, torch.zeros_like(mean_curvature_constraint))
-
         # Initial-boundary constraints of the Eikonal equation at t=0
         sdf_constraint = torch.where(
             gt_sdf != -1,
@@ -195,108 +171,6 @@ class LossMeanCurvature(torch.nn.Module):
             "sdf_constraint": sdf_constraint.mean() * 2e3, # 1e3
             "normal_constraint": normal_constraint.mean() * 1e1, #3e1
             "mean_curvature_constraint": mean_curvature_constraint.mean() * 1e3,
-        }
-
-
-def loss_mean_curv_with_restrictions(X, gt):
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
-
-    grad = gradient(pred_sdf, coords)
-
-    # PDE constraints
-    mean_curvature_constraint = mean_curvature_equation(
-        grad, coords, scale=0.001
-    )
-    mean_curvature_constraint = torch.where(
-        coords[..., 0].unsqueeze(-1) < 0,
-        grad[..., 3].unsqueeze(-1)**2,
-        mean_curvature_constraint
-    )
-
-    # restricting the gradient (fx, fy,fz, ft) of the SIREN function f to the
-    # space: (fx, fy, fz)
-    grad = grad[..., :3]
-
-    sdf_constraint = torch.where(
-        gt_sdf != -1,
-        (gt_sdf - pred_sdf) ** 2,
-        torch.zeros_like(pred_sdf)
-    )
-    normal_constraint = torch.where(
-           gt_sdf != -1,
-           1 - F.cosine_similarity(grad, gt_normals, dim=-1)[..., None],
-           torch.zeros_like(grad[..., :1])
-    )
-
-    return {
-        "sdf_constraint": sdf_constraint.mean() * 1e3,
-        "normal_constraint": normal_constraint.mean() * 1e1,
-        "mean_curvature_constraint": mean_curvature_constraint.mean()*1e3,
-    }
-
-
-# Equation 1 of "Geometric processing with neural fields"
-class loss_NFGP(torch.nn.Module):
-    def __init__(self, trained_model):
-        super().__init__()
-        # Define the model.
-        self.model = trained_model
-        self.model.cuda()
-
-    def forward(self, X, gt):
-        gt_sdf = gt["sdf"]
-        gt_normals = gt["normals"]
-
-        coords = X["model_in"]
-        pred_sdf = X["model_out"]
-
-        grad = gradient(pred_sdf, coords)
-
-        # PDE constraints
-        #mean_curvature_constraint = mean_curvature_equation(grad, coords, scale=0.001)
-        K_g = mean_curvature(grad[...,0:3], coords)
-
-        # trained model
-        trained_model = self.model(coords[...,0:3])
-        trained_model_out = trained_model['model_out']
-        trained_model_in = trained_model['model_in']
-        grad_trained_model = gradient(trained_model_out, trained_model_in)
-        K_f = mean_curvature(grad_trained_model, trained_model_in)
-
-        GPNF_constraint = (K_g - (coords[...,3].unsqueeze(-1)+1)*K_f)**2
-        #GPNF_constraint = (K_g - K_f)**2
-
-        tau = 50
-        #V_tau = torch.maximum(torch.abs(K_g), torch.abs(K_f))
-        V_tau = torch.abs(K_f)
-        GPNF_constraint = torch.where( V_tau<tau, GPNF_constraint, torch.zeros_like(GPNF_constraint))
-        GPNF_constraint = torch.where(torch.abs(trained_model_out)<0.1, GPNF_constraint, torch.zeros_like(GPNF_constraint))
-
-        #restricting the gradient (fx,ty,fz, ft) of the SIREN function f to the space: (fx,ty,fz)
-        grad = grad[...,0:3]
-
-        # Initial-boundary constraints of the Eikonal equation at t=0
-        sdf_constraint = torch.where( gt_sdf!=-1, (trained_model_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-
-        sdf_off_constraint = torch.where( V_tau>tau, (trained_model_out - pred_sdf) ** 2, torch.zeros_like(pred_sdf))
-        sdf_off_constraint = torch.where(gt_sdf==-1, sdf_off_constraint, torch.zeros_like(pred_sdf))
-
-        normal_constraint = torch.where(
-            gt_sdf!=-1,
-            1 - F.cosine_similarity(grad, grad_trained_model, dim=-1)[..., None],
-            torch.zeros_like(grad[..., :1])
-        )
-
-        return {
-            "sdf_constraint": sdf_constraint.mean() * 1e4,
-            "sdf_off_constraint": sdf_off_constraint.mean() * 1e4,
-            "normal_constraint": normal_constraint.mean() * 1e2,
-            "GPNF_constraint": GPNF_constraint.mean()*1e-1,
-            "grad_constraint": eikonal_constraint(grad).mean() * 1e2,
         }
 
 
@@ -446,7 +320,7 @@ class LossMorphing(torch.nn.Module):
 
         return (ft + dot)**2
 
-    def loss_i4d_interpolation(self, X, gt):
+    def loss_nise_interpolation(self, X, gt):
         coords = X["model_in"]
         pred_sdf = X["model_out"]
 
@@ -537,157 +411,5 @@ class LossMorphing(torch.nn.Module):
         }
 
     def forward(self, X, gt):
-        return self.loss_i4d_interpolation(X, gt)
+        return self.loss_nise_interpolation(X, gt)
         # return self.loss_lipschitz_interpolation(X, gt)
-
-
-def loss_eikonal(X, gt):
-    """Loss function used to force a neural homotopy to be a SDF at each time.
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-
-    """
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
-
-    grad = gradient(pred_sdf, coords)
-
-    # PDE constraints
-    # restricting the gradient (fx, fy, fz, ft) of the SIREN function f to the
-    # space: (fx, fy, fz)
-    grad = grad[:, :, :3]
-    grad_constraint_spacetime = eikonal_constraint(grad).unsqueeze(-1)
-
-    # Initial-boundary constraints of the Eikonal equation at t=0
-    sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad)
-    sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
-
-    return {
-        "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
-        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 5e2,
-        "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
-        "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e2,
-    }
-
-
-def loss_eikonal_mean_curv(X, gt):
-    """Loss function employed in Sitzmann et al. for SDF experiments [1].
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-
-    References
-    ----------
-    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
-    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
-    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
-    """
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
-
-    grad = gradient(pred_sdf, coords)
-
-    # PDE constraints
-    mean_curvature_constraint = mean_curvature_equation(grad, coords)
-    # restricting the gradient (fx, fy,fz, ft) of the SIREN function f to the
-    # space: (fx, fy, fz)
-    grad = grad[:, :, :3]
-    grad_constraint_spacetime = eikonal_constraint(grad).unsqueeze(-1)
-
-    # Initial-boundary constraints of the Eikonal equation at t=0
-    sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad)
-    sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
-
-    return {
-        "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
-        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 1e2,
-        "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
-        "mean_curvature_constraint": mean_curvature_constraint.mean() * 0.1,
-        "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e2,
-    }
-
-
-def loss_constant(X, gt):
-    """Loss function employed in Sitzmann et al. for SDF experiments [1].
-
-    Parameters
-    ----------
-    X: dict[str=>torch.Tensor]
-        Model output with the following keys: 'model_in' and 'model_out'
-        with the model input and SDF values respectively.
-
-    gt: dict[str=>torch.Tensor]
-        Ground-truth data with the following keys: 'sdf' and 'normals', with
-        the actual SDF values and the input data normals, respectively.
-
-    Returns
-    -------
-    loss: dict[str=>torch.Tensor]
-        The calculated loss values for each constraint.
-
-    References
-    ----------
-    [1] Sitzmann, V., Martel, J. N. P., Bergman, A. W., Lindell, D. B.,
-    & Wetzstein, G. (2020). Implicit Neural Representations with Periodic
-    Activation Functions. ArXiv. Retrieved from http://arxiv.org/abs/2006.09661
-    """
-    gt_sdf = gt["sdf"]
-    gt_normals = gt["normals"]
-
-    coords = X["model_in"]
-    pred_sdf = X["model_out"]
-
-    grad = gradient(pred_sdf, coords)
-
-    # PDE constraints
-    const_constraint = torch.abs(grad[:, :, 3])
-    # restricting the gradient (fx, fy, fz, ft) of the SIREN function f to the
-    # space: (fx, fy, fz)
-    grad = grad[:, :, :3]
-    grad_constraint_spacetime = eikonal_constraint(grad).unsqueeze(-1)
-
-    # Initial-boundary constraints of the Eikonal equation at t=0
-    sdf_on_surface_constraint = on_surface_sdf_constraint(gt_sdf, pred_sdf)
-    normal_on_surface_constraint = on_surface_normal_constraint(gt_sdf, gt_normals, grad)
-    sdf_off_surface_constraint = off_surface_sdf_constraint(gt_sdf, pred_sdf)
-
-    return {
-        "sdf_on_surface_constraint": sdf_on_surface_constraint.mean() * 3e3,
-        "sdf_off_surface_constraint": sdf_off_surface_constraint.mean() * 1e2,
-        "normal_on_surface_constraint": normal_on_surface_constraint.mean() * 1e2,
-        "const_constraint": const_constraint.mean() * 1e2,
-        "grad_constraint_spacetime": grad_constraint_spacetime.mean() * 1e2,
-    }
