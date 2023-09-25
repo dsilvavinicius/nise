@@ -85,7 +85,11 @@ python reconstruct.py results/meancurvature_bunny/models/best.pth results/meancu
 ```
 9. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
 
-Alternatively, on Linux and macOS systems, steps 3 (except the `activate` command) through 6 are implemented on the `Makefile` at the root of the project.
+<!-- Alternatively, on Linux and macOS systems, steps 3 (except the `activate` command) through 6 are implemented on the `Makefile` at the root of the project. -->
+
+### End Result
+If everything works, MeshLab should show the following image (or an image similar to it):
+
 
 ## Citation
 If you find our work useful in your research, please cite:
