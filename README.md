@@ -13,6 +13,8 @@
 
 This is the official implementation of "Neural Implicit Surface Evolution", published on [arXiv](https://arxiv.org/abs/2201.09636) and to appear at the Proceedings of ICCV 2023.
 
+![Smoothing of the Armadillo - Curvature rendering](figs/smoothing-arm-curvatures.png)
+
 ## Getting started
 
 ### Prerequisites
@@ -35,19 +37,19 @@ The common code is contained in the `nise` package. Inside the respective folder
 * `util.py` - miscelaneous functions and utilities
 
 Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code.
-* `discrete_smoothing.py` -
-* `enlarge_networks.py` - studying the effects of increasing network width in the training results
-* `lipschitz_exp.py` -
-* `mean_curvature_scale.py` - experiments with different values for the mean curvature equation scale parameter
-* `point_sample_proportions.py` - experiments with the proportions of points drawn from the surface, off-surface and along time
-* `smoothing.py` -
-* `training_time_intervals.py` - studies with varying time-intervals for training
+* `discrete_smoothing.py` - experiments with discrete smoothing methods (lapliacian, cotangent, etc.)
+* `enlarge_networks.py` - studying the effects of increasing network width in the training results (see Sec. 4.4 of the supplementary material)
+* `lipschitz_exp.py` - experiments with lipschitz regularization
+* `mean_curvature_scale.py` - experiments with different values for the mean curvature equation scale parameter (see Sec. 4.2 of the supplementary material)
+* `point_sample_proportions.py` - experiments with the proportions of points drawn from the surface, off-surface and along time (see Sec. 4.3 of the supplementary material)
+* `smoothing.py` - smoothing and sharpening experiments (see Sec. 6.2 in the paper)
+* `training_time_intervals.py` - studies with varying time-intervals for training (see Sec. 4.1 of the supplementary material)
 
 The main training and reconstruction scripts are in the repository's root folder:
-* `meancurvature-train.py` -
-* `morph-train.py` -
+* `meancurvature-train.py` - train a smoothing/sharpening of a single neural implicit surface (see Sec 6.2 in the paper)
+* `morph-train.py` - train an interpolation between two neural implicit surfaces (see Sec 6.3 in the paper)
 * `reconstruct.py` - given a trained model (pth) reconstructs the mesh using marching cubes at values `t` given by the user
-* `vectorfield-train.py` -
+* `vectorfield-train.py` - train a neural-based deformation of a neural implicit surface (see Sec 6.1 in the paper)
 
 ### Setup and sample run
 
@@ -67,16 +69,21 @@ pyenv local nise
 pip install -r requirements.txt
 pip install -e .
 ```
-5. Download the [Double Torus Mesh](https://drive.google.com/file/d/11PkscMHBUkkENhHfI1lpH5Dh6X9f2028/view?usp=sharing) into the `data` folder in the repository
-6. Run the main script passing the pipeline test configuration file as input
+5. Download the [pretrained neural implicit objects](https://drive.google.com/file/d/11PkscMHBUkkENhHfI1lpH5Dh6X9f2028/view?usp=sharing) into the `ni` folder in the repository
+6. Download the [meshes]() into the `data` folder in the repository
+7. Run the desired script passing the pipeline test configuration file as input
 ```
-python main.py experiments/double_torus_toy.json
+python meancurvature-train.py experiments/meancurvature_bunny.yaml
 ```
-7. Run MeshLab and open the resulting mesh file `logs/double_torus_toy/final.ply`
-8. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress.
+7. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress
 ```
-tensorboard --logdir logs/double_torus_toy
+tensorboard --logdir results/meancurvature_bunny/summaries
 ```
+8. Run the reconstruction script to convert the output model to a series of meshes
+```
+python reconstruct.py results/meancurvature_bunny/models/best.pth results/meancurvature_bunny/reconstructions/ -t -0.2 0.0 0.2
+```
+9. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
 
 Alternatively, on Linux and macOS systems, steps 3 (except the `activate` command) through 6 are implemented on the `Makefile` at the root of the project.
 

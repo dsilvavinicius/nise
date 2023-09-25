@@ -21,7 +21,7 @@ import yaml
 from nise.dataset import SpaceTimePointCloudNI
 from nise.loss import LossVectorField
 from nise.meshing import create_mesh, save_ply
-from nise.model import SIREN, from_pth
+from nise.model import SIREN
 from nise.util import create_output_paths
 
 
@@ -130,12 +130,7 @@ if __name__ == '__main__':
     )
 
     writer = SummaryWriter(osp.join(experimentpath, 'summaries'))
-
     model.zero_grad(set_to_none=True)
-    # w0 = model.w0
-    # model.update_omegas(1)
-    # model.from_pretrained_initial_condition(torch.load(ni))
-    # model.update_omegas(w0)
 
     if "timesampler" in training_data_config:
         timerange = training_data_config["timesampler"].get(
@@ -191,17 +186,6 @@ if __name__ == '__main__':
     best_weights = None
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
-
-    # Reconstruct without training
-    # meshpath = osp.join(
-    #     experimentpath, "reconstructions", "check_0"
-    # )
-    # os.makedirs(meshpath, exist_ok=True)
-    # reconstruct_with_curvatures(
-    #     model, checkpoint_times, meshpath, device=device,
-    #     resolution=256
-    # )
-    # model = model.train()
 
     if not KAOLIN_AVAILABLE and args.kaolin:
         print("Kaolin was selected but is not available. Switching to the"

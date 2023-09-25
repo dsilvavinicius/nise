@@ -149,7 +149,9 @@ if __name__ == "__main__":
         model.update_omegas(w0)
 
     if "timesampler" in training_mesh_config:
-        timerange = training_mesh_config["timesampler"].get("range", [-1.0, 1.0])
+        timerange = training_mesh_config["timesampler"].get(
+            "range", [-1.0, 1.0]
+        )
         dataset.time_sampler = torch.distributions.uniform.Uniform(
             timerange[0], timerange[1]
         )
@@ -188,16 +190,6 @@ if __name__ == "__main__":
     omegas = dict()  # {3: 10}  # Setting the omega_0 value of t (coord. 3) to 10
     training_loss = {}
 
-    # Reconstruct without training
-    # meshpath = osp.join(
-    #     experimentpath, "reconstructions", "check_0"
-    # )
-    # os.makedirs(meshpath, exist_ok=True)
-    # reconstruct_with_curvatures(
-    #     model, checkpoint_times, meshpath, device=device,
-    #     resolution=256
-    # )
-    # model = model.train()
     if not KAOLIN_AVAILABLE and args.kaolin:
         print("Kaolin was selected but is not available. Switching to the"
               " usual checkpoint saving.")
