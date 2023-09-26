@@ -68,8 +68,8 @@ pyenv local nise
 pip install -r requirements.txt
 pip install -e .
 ```
-5. Download the [pretrained neural implicit objects](https://drive.google.com/file/d/11PkscMHBUkkENhHfI1lpH5Dh6X9f2028/view?usp=sharing) into the `ni` folder in the repository
-6. Download the [meshes]() into the `data` folder in the repository
+5. Download the [pretrained neural implicit objects](https://drive.google.com/file/d/1QuhAqnxfRSWFu10zYPFAOoNO66MGvWjV/view?usp=drive_link) into the `ni` folder in the repository
+6. Download the [meshes](https://drive.google.com/file/d/1Zg-ZSpR6O_YrY2xd4CU_3yFeLi31uaN9/view?usp=drive_link) into the `data` folder in the repository
 7. Run the desired script passing the pipeline test configuration file as input
 ```
 python meancurvature-train.py experiments/meancurvature_bunny.yaml
