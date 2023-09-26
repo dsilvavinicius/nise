@@ -94,13 +94,12 @@ If everything works, MeshLab should show the following image (or an image simila
 ## Citation
 If you find our work useful in your research, please cite:
 ```
-@misc{novello2023neural,
-      title={Neural Implicit Surface Evolution},
-      author={Tiago Novello and Vinicius da Silva and Guilherme Schardong and Luiz Schirmer and Helio Lopes and Luiz Velho},
-      year={2023},
-      eprint={2201.09636},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@article{novello2022neural,
+	title = {Neural Implicit Surface Evolution},
+	author = {Novello, Tiago and da Silva, Vin\'icius and Schardong, Guilherme and Schirmer,
+		Luiz and Lopes, H\'elio and Velho, Luiz},
+	booktitle={Proceedings of the IEEE/CVF international conference on computer vision},
+	year = {2023}
 }
 ```
 
