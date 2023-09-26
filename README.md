@@ -22,8 +22,8 @@ This is the official implementation of "Neural Implicit Surface Evolution", publ
 1. [Anaconda](https://www.anaconda.com/products/individual#Downloads), alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) on UNIX based/like systems
 2. [Git](https://git-scm.com/download)
 3. [Integrate Git Bash with conda](https://discuss.codecademy.com/t/setting-up-conda-in-git-bash/534473) (If on Windows)
-4. [MeshLab](https://www.meshlab.net/)
-5. [NVIDIA Kaolin](https://github.com/NVIDIAGameWorks/kaolin/)
+4. (Optional) [MeshLab](https://www.meshlab.net/)
+5. (Optional) [NVIDIA Kaolin](https://github.com/NVIDIAGameWorks/kaolin/)
 
 If using Linux, or macOS, these programs should be available through the package manager, or Homebrew.
 
@@ -42,7 +42,9 @@ The main training and reconstruction scripts are in the repository's root folder
 * `reconstruct.py` - given a trained model (pth) reconstructs the mesh using marching cubes at values `t` given by the user
 * `vectorfield-train.py` - train a neural-based deformation of a neural implicit surface (see Sec 6.1 in the paper)
 
-Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code. Note that we've ran them some time ago and may not run as smoothly as expected.
+Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code.
+
+**Note that these scripts were written them some time ago and may not run as smoothly as expected. We are working to update them.**
 * `discrete_smoothing.py` - experiments with discrete smoothing methods (laplacian, cotangent, etc.)
 * `enlarge_networks.py` - studying the effects of increasing network width in the training results (see Sec. 4.4 of the supplementary material)
 * `lipschitz_exp.py` - experiments with lipschitz regularization
@@ -74,15 +76,16 @@ pip install -e .
 ```
 python meancurvature-train.py experiments/meancurvature_bunny.yaml
 ```
-7. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress
+    7.a. Optionally, pass the `--kaolin` switch to the training scripts to visualize the meshes using NVIDIA Kaolin
+8. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress
 ```
 tensorboard --logdir results/meancurvature_bunny/summaries
 ```
-8. Run the reconstruction script to convert the output model to a series of meshes
+9. Run the reconstruction script to convert the output model to a series of meshes
 ```
 python reconstruct.py results/meancurvature_bunny/models/best.pth results/meancurvature_bunny/reconstructions/ -t -0.2 0.0 0.2
 ```
-9. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
+10. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
 
 <!-- Alternatively, on Linux and macOS systems, steps 3 (except the `activate` command) through 6 are implemented on the `Makefile` at the root of the project. -->
 
