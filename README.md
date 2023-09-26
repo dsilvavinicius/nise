@@ -36,20 +36,19 @@ The common code is contained in the `nise` package. Inside the respective folder
 * `model.py` - networks and layers implementations
 * `util.py` - miscelaneous functions and utilities
 
-Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code.
-* `discrete_smoothing.py` - experiments with discrete smoothing methods (lapliacian, cotangent, etc.)
-* `enlarge_networks.py` - studying the effects of increasing network width in the training results (see Sec. 4.4 of the supplementary material)
-* `lipschitz_exp.py` - experiments with lipschitz regularization
-* `mean_curvature_scale.py` - experiments with different values for the mean curvature equation scale parameter (see Sec. 4.2 of the supplementary material)
-* `point_sample_proportions.py` - experiments with the proportions of points drawn from the surface, off-surface and along time (see Sec. 4.3 of the supplementary material)
-* `smoothing.py` - smoothing and sharpening experiments (see Sec. 6.2 in the paper)
-* `training_time_intervals.py` - studies with varying time-intervals for training (see Sec. 4.1 of the supplementary material)
-
 The main training and reconstruction scripts are in the repository's root folder:
 * `meancurvature-train.py` - train a smoothing/sharpening of a single neural implicit surface (see Sec 6.2 in the paper)
 * `morph-train.py` - train an interpolation between two neural implicit surfaces (see Sec 6.3 in the paper)
 * `reconstruct.py` - given a trained model (pth) reconstructs the mesh using marching cubes at values `t` given by the user
 * `vectorfield-train.py` - train a neural-based deformation of a neural implicit surface (see Sec 6.1 in the paper)
+
+Additionally, under the `experiment_scripts` folder, there are more scripts with experiments and other auxiliary code that is generally independent of the main code. Note that we've ran them some time ago and may not run as smoothly as expected.
+* `discrete_smoothing.py` - experiments with discrete smoothing methods (laplacian, cotangent, etc.)
+* `enlarge_networks.py` - studying the effects of increasing network width in the training results (see Sec. 4.4 of the supplementary material)
+* `lipschitz_exp.py` - experiments with lipschitz regularization
+* `mean_curvature_scale.py` - experiments with different values for the mean curvature equation scale parameter (see Sec. 4.2 of the supplementary material)
+* `point_sample_proportions.py` - experiments with the proportions of points drawn from the surface, off-surface and along time (see Sec. 4.3 of the supplementary material)
+* `training_time_intervals.py` - studies with varying time-intervals for training (see Sec. 4.1 of the supplementary material)
 
 ### Setup and sample run
 
@@ -95,11 +94,11 @@ If everything works, MeshLab should show the following image (or an image simila
 If you find our work useful in your research, please cite:
 ```
 @article{novello2022neural,
-	title = {Neural Implicit Surface Evolution},
-	author = {Novello, Tiago and da Silva, Vin\'icius and Schardong, Guilherme and Schirmer,
-		Luiz and Lopes, H\'elio and Velho, Luiz},
-	booktitle={Proceedings of the IEEE/CVF international conference on computer vision},
-	year = {2023}
+    title = {Neural Implicit Surface Evolution},
+    author = {Novello, Tiago and da Silva, Vin\'icius and Schardong, Guilherme and Schirmer,
+        Luiz and Lopes, H\'elio and Velho, Luiz},
+    booktitle={Proceedings of the IEEE/CVF international conference on computer vision},
+    year = {2023}
 }
 ```
 
