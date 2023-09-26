@@ -11,7 +11,7 @@
 [3] University of Coimbra (UC)
 [4] University of the Sinos Valley (UNISINOS)
 
-This is the official implementation of "Neural Implicit Surface Evolution", published on [arXiv](https://arxiv.org/abs/2201.09636) and to appear at the Proceedings of ICCV 2023.
+This is the official implementation of "Neural Implicit Surface Evolution", to appear at the Proceedings of ICCV 2023, published on [arXiv](https://arxiv.org/abs/2201.09636) .
 
 ![Smoothing of the Armadillo - Curvature rendering](figs/smoothing-arm-curvatures.png)
 
@@ -85,7 +85,10 @@ tensorboard --logdir results/meancurvature_bunny/summaries
 ```
 python reconstruct.py results/meancurvature_bunny/models/best.pth results/meancurvature_bunny/reconstructions/ -t -0.2 0.0 0.2
 ```
-11. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
+11. Run MeshLab and open one the resulting mesh files
+```
+meshlab results/meancurvature_bunny/reconstructions/time_-0.2.ply
+```
 
 ### End Result
 If everything works, MeshLab should show the following image (or an image similar to it):
