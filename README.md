@@ -11,7 +11,7 @@
 [3] University of Coimbra (UC)
 [4] University of the Sinos Valley (UNISINOS)
 
-This is the official implementation of "Neural Implicit Surface Evolution", to appear at the Proceedings of ICCV 2023, published on [arXiv](https://arxiv.org/abs/2201.09636) .
+This is the official implementation of "Neural Implicit Surface Evolution", to appear at the Proceedings of ICCV 2023, published on [arXiv](https://arxiv.org/abs/2201.09636).
 
 ![Smoothing of the Armadillo - Curvature rendering](figs/smoothing-arm-curvatures.png)
 
