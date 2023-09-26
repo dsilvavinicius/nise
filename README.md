@@ -76,22 +76,19 @@ pip install -e .
 ```
 python meancurvature-train.py experiments/meancurvature_bunny.yaml
 ```
-    7.a. Optionally, pass the `--kaolin` switch to the training scripts to visualize the meshes using NVIDIA Kaolin
-8. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress
+8. (Optional) Pass the `--kaolin` switch to the training scripts to visualize the meshes using NVIDIA Kaolin
+9. (Optional) Run tensorboard using the command below and access http://localhost:6006/ to see the training progress
 ```
 tensorboard --logdir results/meancurvature_bunny/summaries
 ```
-9. Run the reconstruction script to convert the output model to a series of meshes
+10. Run the reconstruction script to convert the output model to a series of meshes
 ```
 python reconstruct.py results/meancurvature_bunny/models/best.pth results/meancurvature_bunny/reconstructions/ -t -0.2 0.0 0.2
 ```
-10. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
-
-<!-- Alternatively, on Linux and macOS systems, steps 3 (except the `activate` command) through 6 are implemented on the `Makefile` at the root of the project. -->
+11. Run MeshLab and open one the resulting mesh files `results/meancurvature_bunny/reconstructions/time_-0.2.ply`
 
 ### End Result
 If everything works, MeshLab should show the following image (or an image similar to it):
-
 
 ## Citation
 If you find our work useful in your research, please cite:
