@@ -93,6 +93,8 @@ meshlab results/meancurvature_bunny/reconstructions/time_-0.2.ply
 ### End Result
 If everything works, MeshLab should show the following image (or an image similar to it):
 
+![Bunny t=-0.2](figs/mc-bunny-t-0.2.png)
+
 ## Citation
 If you find our work useful in your research, please cite:
 ```
