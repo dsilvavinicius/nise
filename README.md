@@ -19,9 +19,8 @@ This is the official implementation of "Neural Implicit Surface Evolution", to a
 
 ### Prerequisites
 
-1. [Anaconda](https://www.anaconda.com/products/individual#Downloads), alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) on UNIX based/like systems
+1. [Mamba (Miniforge)](https://github.com/conda-forge/miniforge) on Windows, alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) on UNIX based/like systems
 2. [Git](https://git-scm.com/download)
-3. [Integrate Git Bash with conda](https://discuss.codecademy.com/t/setting-up-conda-in-git-bash/534473) (If on Windows)
 4. (Optional) [MeshLab](https://www.meshlab.net/)
 5. (Optional) [NVIDIA Kaolin](https://github.com/NVIDIAGameWorks/kaolin/)
 
@@ -57,9 +56,9 @@ Additionally, under the `experiment_scripts` folder, there are more scripts with
 1. Open a terminal (or Git Bash if using Windows)
 2. Clone this repository: `git clone git@github.com:dsilvavinicius/nise.git`
 3. Enter project folder: `cd nise`
-4. Setup project dependencies via conda
+4. Setup project dependencies via Mamba
 ```
-conda env create -f environment.yml
+mamba env create -f environment.yml
 conda activate nise
 pip install -e .
 ```
