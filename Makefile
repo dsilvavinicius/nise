@@ -4,8 +4,10 @@ clean:
 	@rm -Rf __pycache__
 	@rm -Rf results/*
 
+######### Mean-curvature experiments
 meancurv_all: meancurv_armadillo meancurv_bob meancurv_falcon meancurv_max meancurv_neptune meancurv_spot meancurv_witch
 
+##
 meancurv_armadillo: results/meancurvature_armadillo/reconstructions/time_0.0.ply
 	@echo "Mean Curvature Equation: Armadillo trained and reconstructed"
 
@@ -15,6 +17,7 @@ results/meancurvature_armadillo/models/best.pth: experiments/meancurvature_armad
 results/meancurvature_armadillo/reconstructions/time_0.0.ply: results/meancurvature_armadillo/models/best.pth
 	@python tools/reconstruct.py $< $@ -r 256 -t -0.9 -0.5 0.0 0.5 0.9
 
+##
 meancurv_bob: results/meancurvature_bob/reconstructions/
 	@echo "Mean Curvature Equation: Bob trained and reconstructed"
 
@@ -24,6 +27,7 @@ results/meancurvature_bob/models/best.pth: experiments/meancurvature_bob.yaml
 results/meancurvature_bob/reconstructions/: results/meancurvature_bob/models/best.pth
 	python tools/reconstruct.py $< $@ -r 256 -t -0.4 0.0 0.5 0.9
 
+##
 meancurv_falcon: results/meancurvature_falcon/reconstructions/
 	@echo "Mean Curvature Equation: Falcon trained and reconstructed"
 
@@ -33,6 +37,7 @@ results/meancurvature_falcon/models/best.pth: experiments/meancurvature_falcon.y
 results/meancurvature_falcon/reconstructions/: results/meancurvature_falcon/models/best.pth
 	python tools/reconstruct.py $< $@ -r 256 -t -0.05 0.0 0.5 0.9
 
+##
 meancurv_max: results/meancurvature_max/reconstructions/
 	@echo "Mean Curvature Equation: Max trained and reconstructed"
 
@@ -42,6 +47,7 @@ results/meancurvature_max/models/best.pth: experiments/meancurvature_max.yaml
 results/meancurvature_max/reconstructions/: results/meancurvature_max/models/best.pth
 	python tools/reconstruct.py $< $@ -r 256 -t -0.4 0.0 0.5 0.9
 
+##
 meancurv_neptune: results/meancurvature_neptune/reconstructions/
 	@echo "Mean Curvature Equation: Neptune trained and reconstructed"
 
@@ -51,6 +57,7 @@ results/meancurvature_neptune/models/best.pth: experiments/meancurvature_neptune
 results/meancurvature_neptune/reconstructions/: results/meancurvature_neptune/models/best.pth
 	python reconstruct.py $< $@ -r 256 -t 0.0 0.5 0.9
 
+##
 meancurv_spot: results/meancurvature_spot/reconstructions/
 	@echo "Mean Curvature Equation: Spot trained and reconstructed"
 
@@ -60,6 +67,7 @@ results/meancurvature_spot/models/best.pth: experiments/meancurvature_spot.yaml
 results/meancurvature_spot/reconstructions/: results/meancurvature_spot/models/best.pth
 	python reconstruct.py $< $@ -r 256 -t -0.4 0.0 0.5 0.9
 
+##
 meancurv_witch: results/meancurvature_witch/reconstructions/
 	@echo "Mean Curvature Equation: Witch trained and reconstructed"
 
@@ -69,6 +77,7 @@ results/meancurvature_witch/models/best.pth: experiments/meancurvature_witch.yam
 results/meancurvature_witch/reconstructions/: results/meancurvature_witch/models/best.pth
 	python reconstruct.py $< $@ -r 256 -t -0.9 0.5 0.0 0.5 0.9
 
+########## Morphing
 morph_spot-bob: results/morph_spot-bob/reconstructions/
 	@echo "Morph: Morphing of spot=>bob trained and reconstructed"
 
@@ -78,7 +87,27 @@ results/morph_spot-bob/models/best.pth: experiments/morph_spot-bob.yaml
 results/morph_spot-bob/reconstructions/: results/morph_spot-bob/models/best.pth
 	python reconstruct.py $< $@ -r 256 -t -0.9 0.5 0.0 0.5 0.9
 
+########## Vector-field experiments
+vectorfield_bob: results/vectorfield_bob/reconstructions/
+	echo "Vectorfield: Vectorfield of bob trained and reconstructed "
+
+results/vectorfield_bob/models/best.pth: experiments/vectorfield_bob.yaml
+	@python vectorfield-train.py $<
+
+results/vectorfield_bob/reconstructions/: results/vectorfield_bob/models/best.pth
+	python reconstruct.py $< $@ -r 256 -t -0.9 -0.5 0.0 0.5 0.9
+
+##
+vectorfield_spot: results/vectorfield_spot/reconstructions/
+	echo "Vectorfield: Vectorfield of spot trained and reconstructed "
+
+results/vectorfield_spot/models/best.pth: experiments/vectorfield_spot.yaml
+	@python vectorfield-train.py $<
+
+results/vectorfield_spot/reconstructions/: results/vectorfield_spot/models/best.pth
+	python reconstruct.py $< $@ -r 256 -t -0.9 -0.5 0.0 0.5 0.9
+
 conda-env:
 	@conda env create -f environment.yml
 
-.PHONY: all clean conda-env meancurv_all meancurv_armadillo meancurv_bob meancurv_falcon meancurv_max meancurv_neptune meancurv_spot meancurv_witch
+.PHONY: all clean conda-env meancurv_all meancurv_armadillo meancurv_bob meancurv_falcon meancurv_max meancurv_neptune meancurv_spot meancurv_witch morph_spot-bob vectorfield_bob vectorfield_spot
