@@ -7,11 +7,14 @@
 [Luiz Velho [1]](https://lvelho.impa.br/)
 <br>
 [1] Institute for Pure and Applied Mathematics (IMPA),
+<br>
 [2] Pontifical Catholic University of Rio de Janeiro (PUC-Rio),
+<br>
 [3] University of Coimbra (UC)
+<br>
 [4] University of the Sinos Valley (UNISINOS)
 
-This is the official implementation of "Neural Implicit Surface Evolution", to appear at the Proceedings of ICCV 2023, published on [arXiv](https://arxiv.org/abs/2201.09636).
+This is the official implementation of "Neural Implicit Surface Evolution", published on the [Proceedings of ICCV 2023](https://openaccess.thecvf.com/content/ICCV2023/html/Novello_Neural_Implicit_Surface_Evolution_ICCV_2023_paper.html), also published on [arXiv](https://arxiv.org/abs/2201.09636). More results and examples on the [project page](https://dsilvavinicius.github.io/nise)
 
 ![Smoothing of the Armadillo - Curvature rendering](figs/smoothing-arm-curvatures.png)
 
