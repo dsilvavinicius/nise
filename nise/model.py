@@ -379,7 +379,7 @@ class SIREN(nn.Module):
             raise ValueError(
                 "Invalid first-layer size on the reference weights."
                 f" Is {first_layer.shape[1]}, should be"
-                f" {self.net[0][0].weights.shape[1] - 1}."
+                f" {self.net[0][0].weight.shape[1] - 1}."
             )
 
         my_sd = self.state_dict()
